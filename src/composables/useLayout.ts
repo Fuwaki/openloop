@@ -1,17 +1,8 @@
 import { ref } from 'vue'
 import type { LayoutNode } from '@/components/layout-tree'
+import { getViewPresets } from '@/views/registry'
 
-function uid() { return crypto.randomUUID() }
-
-const root = ref<LayoutNode>({
-  id: uid(),
-  type: 'split',
-  dir: 'h',
-  children: [
-    { id: uid(), type: 'panel', panelType: 'editor' },
-    { id: uid(), type: 'panel', panelType: 'output' },
-  ],
-})
+const root = ref<LayoutNode>(getViewPresets()[0]!.layout)
 
 function setLayout(layout: LayoutNode) {
   root.value = layout

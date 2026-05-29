@@ -6,12 +6,12 @@ import PanelManager from './components/PanelManager.vue'
 import RightPanel from './components/RightPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ToastContainer from './components/ToastContainer.vue'
-import type { ViewPreset } from './views/registry'
+import { getViewPresets, type ViewPreset } from './views/registry'
 import { useModelLoader } from './composables/useModelLoader'
 import { DEFAULT_MODEL_ID } from './models/model-table'
 
 const showSettings = ref(false)
-const currentView = ref<ViewPreset | null>(null)
+const currentView = ref<ViewPreset>(getViewPresets()[0]!)
 
 // 默认加载弹簧振子模型
 const { loadModel } = useModelLoader()
