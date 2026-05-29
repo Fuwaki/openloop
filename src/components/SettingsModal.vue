@@ -1,0 +1,164 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+
+defineEmits<{
+  close: []
+}>()
+
+const tabs = [
+  { id: 'general', label: '常规', icon: 'i-carbon-settings-adjust' },
+  { id: 'sim', label: '仿真', icon: 'i-carbon-play-outline' },
+  { id: 'python', label: 'Python', icon: 'i-carbon-logo-python' },
+  { id: 'about', label: '关于', icon: 'i-carbon-information' },
+]
+
+const activeTab = ref('general')
+
+// 模拟设置数据
+const settings = ref({
+  language: 'zh-CN',
+  theme: 'dark',
+  simStep: 0.01,
+  simTimeout: 30,
+  autoRun: false,
+  preloadPackages: 'numpy',
+})
+</script>
+
+<template>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    @click.self="$emit('close')"
+  >
+    <div class="bg-surface rounded-xl shadow-2xl w-[700px] h-[480px] flex overflow-hidden border border-surfaceHover">
+      <!-- 左侧 tab 列表 -->
+      <div class="w-40 bg-bgBase border-r border-surfaceHover flex flex-col py-4 shrink-0">
+        <div class="px-4 pb-3 mb-2 border-b border-surfaceHover">
+          <h2 class="text-textBase text-sm font-bold">设置</h2>
+        </div>
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          class="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-colors cursor-pointer"
+          :class="activeTab === tab.id ? 'text-primary bg-primary/10 border-r-2 border-primary' : 'text-textMuted hover:text-textBase hover:bg-surfaceHover'"
+          @click="activeTab = tab.id"
+        >
+          <span :class="tab.icon" class="w-4 h-4" />
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <!-- 右侧内容 -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- 标题栏 -->
+        <div class="flex items-center justify-between px-6 py-3 border-b border-surfaceHover">
+          <h3 class="text-textBase text-sm font-medium">
+            {{ tabs.find(t => t.id === activeTab)?.label }}
+          </h3>
+          <button
+            class="text-textMuted hover:text-error w-6 h-6 flex items-center justify-center cursor-pointer"
+            @click="$emit('close')"
+          >
+            <span class="i-carbon-close w-4 h-4" />
+          </button>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-5">
+
+          <!-- 常规 -->
+          <template v-if="activeTab === 'general'">
+            <div class="space-y-1.5">
+              <label class="text-textBase text-xs font-medium">语言</label>
+              <select
+                v-model="settings.language"
+                class="w-full bg-bgBase text-textBase text-sm px-3 py-2 rounded-lg border border-surfaceHover focus:border-primary outline-none"
+              >
+                <option value="zh-CN">简体中文</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-textBase text-xs font-medium">主题</label>
+              <select
+                v-model="settings.theme"
+                class="w-full bg-bgBase text-textBase text-sm px-3 py-2 rounded-lg border border-surfaceHover focus:border-primary outline-none"
+              >
+                <option value="dark">深色</option>
+                <option value="light">浅色</option>
+              </select>
+            </div>
+          </template>
+
+          <!-- 仿真 -->
+          <template v-if="activeTab === 'sim'">
+            <div class="space-y-1.5">
+              <label class="text-textBase text-xs font-medium">仿真步长 (s)</label>
+              <input
+                v-model.number="settings.simStep"
+                type="number"
+                step="0.001"
+                min="0.001"
+                class="w-full bg-bgBase text-textBase text-sm px-3 py-2 rounded-lg border border-surfaceHover focus:border-primary outline-none"
+              />
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-textBase text-xs font-medium">超时时间 (s)</label>
+              <input
+                v-model.number="settings.simTimeout"
+                type="number"
+                min="1"
+                class="w-full bg-bgBase text-textBase text-sm px-3 py-2 rounded-lg border border-surfaceHover focus:border-primary outline-none"
+              />
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="text-textBase text-xs font-medium">代码变更后自动运行</label>
+              <button
+                class="w-10 h-5 rounded-full transition-colors cursor-pointer relative"
+                :class="settings.autoRun ? 'bg-primary' : 'bg-surfaceHover'"
+                @click="settings.autoRun = !settings.autoRun"
+              >
+                <span
+                  class="absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform"
+                  :class="settings.autoRun ? 'translate-x-5' : 'translate-x-0.5'"
+                />
+              </button>
+            </div>
+          </template>
+
+          <!-- Python -->
+          <template v-if="activeTab === 'python'">
+            <div class="space-y-1.5">
+              <label class="text-textBase text-xs font-medium">预加载包（逗号分隔）</label>
+              <input
+                v-model="settings.preloadPackages"
+                type="text"
+                class="w-full bg-bgBase text-textBase text-sm px-3 py-2 rounded-lg border border-surfaceHover focus:border-primary outline-none"
+                placeholder="numpy, scipy, matplotlib"
+              />
+              <p class="text-textMuted text-xs">Pyodide 启动时自动加载的 Python 包</p>
+            </div>
+            <div class="bg-bgBase rounded-lg p-4 border border-surfaceHover">
+              <p class="text-textMuted text-xs">Pyodide 版本: <span class="text-textBase">0.29.4</span></p>
+              <p class="text-textMuted text-xs mt-1">Python 版本: <span class="text-textBase">3.13</span></p>
+            </div>
+          </template>
+
+          <!-- 关于 -->
+          <template v-if="activeTab === 'about'">
+            <div class="text-center py-6 space-y-3">
+              <div class="text-primary text-3xl font-bold">OpenLoop</div>
+              <p class="text-textMuted text-sm">交互式控制算法仿真 Playground</p>
+              <div class="text-textMuted text-xs space-y-1 pt-4">
+                <p>版本: 0.0.1</p>
+                <p>Vue 3 + Vite + UnoCSS + Pyodide</p>
+                <p>PixiJS + uPlot + Monaco Editor</p>
+              </div>
+            </div>
+          </template>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
