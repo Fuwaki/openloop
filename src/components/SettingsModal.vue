@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import AppLogo from './AppLogo.vue'
 
 defineEmits<{
   close: []
@@ -146,14 +147,42 @@ const settings = ref({
 
           <!-- 关于 -->
           <template v-if="activeTab === 'about'">
-            <div class="text-center py-6 space-y-3">
-              <div class="text-primary text-3xl font-bold">OpenLoop</div>
+            <div class="flex flex-col items-center py-4 space-y-5">
+              <AppLogo :size="56" show-text />
               <p class="text-textMuted text-sm">交互式控制算法仿真 Playground</p>
-              <div class="text-textMuted text-xs space-y-1 pt-4">
-                <p>版本: 0.0.1</p>
-                <p>Vue 3 + Vite + UnoCSS + Pyodide</p>
-                <p>PixiJS + uPlot + Monaco Editor</p>
+
+              <div class="w-full bg-bgBase rounded-lg p-4 border border-surfaceHover space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-textMuted text-xs">版本</span>
+                  <span class="text-primary text-xs font-mono">v0.0.1</span>
+                </div>
+                <div class="border-t border-surfaceHover" />
+                <div class="flex items-center justify-between">
+                  <span class="text-textMuted text-xs">前端框架</span>
+                  <span class="text-textBase text-xs font-mono">Vue 3 + Vite + UnoCSS</span>
+                </div>
+                <div class="border-t border-surfaceHover" />
+                <div class="flex items-center justify-between">
+                  <span class="text-textMuted text-xs">Python 运行时</span>
+                  <span class="text-textBase text-xs font-mono">Pyodide 0.29.4</span>
+                </div>
+                <div class="border-t border-surfaceHover" />
+                <div class="flex items-center justify-between">
+                  <span class="text-textMuted text-xs">渲染 / 图表 / 编辑器</span>
+                  <span class="text-textBase text-xs font-mono">PixiJS + uPlot + Monaco</span>
+                </div>
               </div>
+
+              <a
+                href="https://github.com/Fuwaki/openloop"
+                target="_blank"
+                class="flex items-center gap-1.5 text-textMuted hover:text-primary text-xs transition-colors"
+              >
+                <span class="i-carbon-logo-github w-4 h-4" />
+                github.com/Fuwaki/openloop
+              </a>
+
+              <p class="text-textMuted/50 text-[10px]">Made with ❤ for students and control engineers</p>
             </div>
           </template>
 
