@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { useModelLoader } from '@/composables/useModelLoader'
+import { useUserParams } from '@/composables/useUserParams'
+import { updateParamValues } from '@/composables/useOpenLoopModule'
 
 export interface Param {
   name: string
@@ -29,7 +31,13 @@ const expandedIndex = ref<number | null>(null)
 const editingIndex = ref<number | null>(null)
 const editValue = ref('')
 const valueInputRef = ref<HTMLInputElement | null>(null)
+function setValueInputRef(el: unknown, index: number) {
+  if (editingIndex.value === index && el instanceof HTMLInputElement) {
+    valueInputRef.value = el
+  }
+}
 const { currentParams, currentPlant } = useModelLoader()
+const { userParams } = useUserParams()
 
 watch(currentParams, (val) => {
   localParams.value = val.map((p) => ({ ...p }))
@@ -79,9 +87,16 @@ function onEditKeydown(p: Param, e: KeyboardEvent) {
 function onConfigInput(p: Param, field: 'min' | 'max' | 'step', e: Event) {
   const v = Number((e.target as HTMLInputElement).value)
   if (Number.isNaN(v)) return
+  if (field === 'step' && v <= 0) return
   p[field] = v
-  if (field === 'min') p.value = Math.max(p.value, v)
-  if (field === 'max') p.value = Math.min(p.value, v)
+  if (field === 'min') {
+    if (v > p.max) p.max = v
+    p.value = Math.max(p.value, v)
+  }
+  if (field === 'max') {
+    if (v < p.min) p.min = v
+    p.value = Math.min(p.value, v)
+  }
   emitUpdate()
 }
 
@@ -92,13 +107,24 @@ function removeParam(index: number) {
   emitUpdate()
 }
 
-function sliderPercent(p: Param): number {
-  if (p.max === p.min) return 50
-  return ((p.value - p.min) / (p.max - p.min)) * 100
+function onUserParamInput(p: { name: string; value: number }, e: Event) {
+  p.value = Number((e.target as HTMLInputElement).value)
+  updateParamValues({ [p.name]: p.value })
+}
+
+function sliderPercent(p: { value: number; min: number; max: number }): number {
+  if (p.max <= p.min) return 50
+  return Math.max(0, Math.min(100, ((p.value - p.min) / (p.max - p.min)) * 100))
 }
 
 function formatValue(v: number, step = 0.01): string {
-  const decimals = String(step).split('.')[1]?.length ?? 2
+  if (!Number.isFinite(v)) return String(v)
+  const s = String(step)
+  // 整数 step 或科学计数法时，用 toPrecision 兜底
+  if (!s.includes('.') || s.includes('e')) {
+    return Number.isInteger(step) ? v.toFixed(0) : v.toPrecision(4)
+  }
+  const decimals = s.split('.')[1]?.length ?? 2
   return v.toFixed(decimals)
 }
 </script>
@@ -109,7 +135,7 @@ function formatValue(v: number, step = 0.01): string {
       <div
         v-for="(p, i) in localParams"
         :key="i"
-        class="group rounded-lg bg-bgSurface hover:bg-bgSurfaceHover transition-colors"
+        class="group rounded-lg bg-surface hover:bg-surfaceHover transition-colors"
       >
         <!-- Main row -->
         <div class="flex items-center gap-2 px-3 py-2">
@@ -118,7 +144,7 @@ function formatValue(v: number, step = 0.01): string {
 
           <!-- Slider -->
           <div class="flex-1 relative flex items-center h-5">
-            <div class="absolute inset-x-0 h-1 rounded-full bg-bgSurfaceHover">
+            <div class="absolute inset-x-0 h-1 rounded-full bg-surfaceHover">
               <div
                 class="absolute h-full rounded-full bg-primary/60"
                 :style="{ width: sliderPercent(p) + '%' }"
@@ -143,14 +169,14 @@ function formatValue(v: number, step = 0.01): string {
           <!-- Value (click to edit) -->
           <div
             v-if="editingIndex !== i"
-            class="w-16 text-right text-xs font-mono text-textBase bg-bgBase rounded px-1.5 py-0.5 cursor-text hover:bg-bgSurfaceHover transition-colors select-none"
+            class="w-16 text-right text-xs font-mono text-textBase bg-bgBase rounded px-1.5 py-0.5 cursor-text hover:bg-surfaceHover transition-colors select-none"
             @click="startEdit(i)"
           >
             {{ formatValue(p.value, p.step ?? 0.01) }}
           </div>
           <input
             v-else
-            ref="valueInputRef"
+            :ref="(el: unknown) => setValueInputRef(el, i)"
             type="number"
             v-model="editValue"
             :step="p.step ?? 0.01"
@@ -161,7 +187,7 @@ function formatValue(v: number, step = 0.01): string {
 
           <!-- Settings toggle -->
           <button
-            class="w-5 h-5 flex items-center justify-center rounded text-textMuted hover:text-textBase hover:bg-bgSurfaceHover transition-colors opacity-0 group-hover:opacity-100"
+            class="w-5 h-5 flex items-center justify-center rounded text-textMuted hover:text-textBase hover:bg-surfaceHover transition-colors opacity-0 group-hover:opacity-100"
             :class="{ '!opacity-100 text-primary': expandedIndex === i }"
             @click="toggleExpand(i)"
           >
@@ -175,7 +201,7 @@ function formatValue(v: number, step = 0.01): string {
         <!-- Expanded config -->
         <div
           v-if="expandedIndex === i"
-          class="px-3 pb-2.5 pt-0.5 space-y-2 border-t border-bgSurfaceHover"
+          class="px-3 pb-2.5 pt-0.5 space-y-2 border-t border-surfaceHover"
         >
           <div class="grid grid-cols-3 gap-2">
             <label class="flex flex-col gap-0.5">
@@ -184,7 +210,7 @@ function formatValue(v: number, step = 0.01): string {
                 type="number"
                 :value="p.min"
                 :step="p.step ?? 0.01"
-                class="bg-bgBase text-textBase text-xs text-center px-1.5 py-1 rounded border border-bgSurfaceHover focus:border-primary outline-none"
+                class="bg-bgBase text-textBase text-xs text-center px-1.5 py-1 rounded border border-surfaceHover focus:border-primary outline-none"
                 @input="onConfigInput(p, 'min', $event)"
               />
             </label>
@@ -194,7 +220,7 @@ function formatValue(v: number, step = 0.01): string {
                 type="number"
                 :value="p.max"
                 :step="p.step ?? 0.01"
-                class="bg-bgBase text-textBase text-xs text-center px-1.5 py-1 rounded border border-bgSurfaceHover focus:border-primary outline-none"
+                class="bg-bgBase text-textBase text-xs text-center px-1.5 py-1 rounded border border-surfaceHover focus:border-primary outline-none"
                 @input="onConfigInput(p, 'max', $event)"
               />
             </label>
@@ -205,7 +231,7 @@ function formatValue(v: number, step = 0.01): string {
                 :value="p.step ?? 0.01"
                 min="0.001"
                 step="0.001"
-                class="bg-bgBase text-textBase text-xs text-center px-1.5 py-1 rounded border border-bgSurfaceHover focus:border-primary outline-none"
+                class="bg-bgBase text-textBase text-xs text-center px-1.5 py-1 rounded border border-surfaceHover focus:border-primary outline-none"
                 @input="onConfigInput(p, 'step', $event)"
               />
             </label>
@@ -219,7 +245,7 @@ function formatValue(v: number, step = 0.01): string {
                 type="text"
                 v-model="p.name"
                 maxlength="8"
-                class="flex-1 bg-bgBase text-textBase text-xs font-mono px-1.5 py-1 rounded border border-bgSurfaceHover focus:border-primary outline-none"
+                class="flex-1 bg-bgBase text-textBase text-xs font-mono px-1.5 py-1 rounded border border-surfaceHover focus:border-primary outline-none"
                 @change="emitUpdate()"
               />
             </label>
@@ -231,6 +257,46 @@ function formatValue(v: number, step = 0.01): string {
                 <path d="M3 4h10M6 4V3h4v1M5 4v8h6V4" />
               </svg>
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 用户参数（ol.parameter） -->
+    <div v-if="userParams.length > 0" class="border-t border-surfaceHover">
+      <div class="px-3 py-1.5 text-[10px] text-textMuted uppercase tracking-wider">用户参数</div>
+      <div class="flex-1 overflow-y-auto p-2 space-y-1">
+        <div
+          v-for="(p, i) in userParams"
+          :key="p.name"
+          class="group rounded-lg bg-surface hover:bg-surfaceHover transition-colors"
+        >
+          <div class="flex items-center gap-2 px-3 py-2">
+            <span class="text-textBase text-sm font-mono w-16 shrink-0 truncate" :title="p.name">{{ p.name }}</span>
+            <div class="flex-1 relative flex items-center h-5">
+              <div class="absolute inset-x-0 h-1 rounded-full bg-surfaceHover">
+                <div
+                  class="absolute h-full rounded-full bg-primary/60"
+                  :style="{ width: sliderPercent(p) + '%' }"
+                />
+              </div>
+              <input
+                type="range"
+                :value="p.value"
+                :min="p.min"
+                :max="p.max"
+                :step="p.step"
+                class="absolute inset-x-0 w-full h-5 opacity-0 cursor-pointer"
+                @input="onUserParamInput(p, $event)"
+              />
+              <div
+                class="absolute w-3 h-3 rounded-full bg-primary shadow-sm pointer-events-none transition-transform group-hover:scale-110"
+                :style="{ left: `calc(${sliderPercent(p)}% - 6px)` }"
+              />
+            </div>
+            <span class="w-16 text-right text-xs font-mono text-textMuted">
+              {{ formatValue(p.value, p.step) }}
+            </span>
           </div>
         </div>
       </div>
