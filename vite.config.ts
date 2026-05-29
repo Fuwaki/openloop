@@ -6,6 +6,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import UnoCSS from 'unocss/vite'
 
 export default defineConfig({
+  base: process.env.BASE_PATH ?? '/',
   plugins: [
     vue(),
     vueDevTools(),
