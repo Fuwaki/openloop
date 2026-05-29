@@ -1,6 +1,9 @@
 import { ref, shallowRef } from 'vue'
 import { getModelEntry, getModelsByCategory, type ModelEntry, type ParamDef } from '@/models/model-table'
+import { emptyCode } from '@/models/controller-table'
 import type { PlantModel } from '@/simulation/plants/types'
+import { currentCode } from './useSimulationState'
+import { generateControllerCode } from './useCodeGenerator'
 
 /**
  * 模型加载器 — 单例。
@@ -8,7 +11,7 @@ import type { PlantModel } from '@/simulation/plants/types'
  * 唯一入口：loadModel(id) 完成一切联动：
  *   1. 查找模型表条目
  *   2. 创建仿真用 PlantModel
- *   3. 设置 starterCode
+ *   3. 设置 currentCode（示例代码）
  *   4. 重置仿真状态
  *
  * UI 组件只读消费，不直接操作 useSimulationState。
@@ -16,7 +19,6 @@ import type { PlantModel } from '@/simulation/plants/types'
 
 const currentEntry = ref<ModelEntry | null>(null)
 const currentPlant = shallowRef<PlantModel | null>(null)
-const starterCode = ref<string | null>(null)
 
 /** 当前参数副本（UI 绑定） */
 const currentParams = ref<ParamDef[]>([])
@@ -54,7 +56,7 @@ async function loadModel(id: string, params?: Record<string, number>): Promise<b
   for (const p of currentParams.value) paramMap[p.name] = p.value
 
   currentPlant.value = entry.createPlant(paramMap)
-  starterCode.value = entry.starterCode
+  currentCode.value = generateControllerCode(entry, emptyCode, [])
 
   return true
 }
@@ -62,7 +64,7 @@ async function loadModel(id: string, params?: Record<string, number>): Promise<b
 function clearModel() {
   currentEntry.value = null
   currentPlant.value = null
-  starterCode.value = null
+  currentCode.value = ''
   currentParams.value = []
 }
 
@@ -70,7 +72,6 @@ export function useModelLoader() {
   return {
     currentEntry,
     currentPlant,
-    starterCode,
     currentParams,
     loadModel,
     clearModel,
