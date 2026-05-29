@@ -37,3 +37,10 @@ export interface JointData {
   center: Vec2
   radius?: number
 }
+
+export interface TankData {
+  center: Vec2
+  size: Vec2
+  level: number
+  label?: string
+}

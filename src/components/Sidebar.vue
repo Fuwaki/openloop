@@ -1,23 +1,28 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useSimulation } from '@/composables/useSimulation'
-import { getModelsByCategory, type PlantModel } from '@/models/registry'
+import { ref, computed, watch } from 'vue'
+import { useSimulationRunner } from '@/composables/useSimulationRunner'
+import { useSimulationState } from '@/composables/useSimulationState'
+import { useToast } from '@/composables/useToast'
+import { useModelLoader } from '@/composables/useModelLoader'
+import type { ModelEntry } from '@/models/model-table'
 import AppLogo from './AppLogo.vue'
-
-const props = defineProps<{
-  modelValue?: PlantModel | null
-}>()
 
 const emit = defineEmits<{
   openSettings: []
-  'update:modelValue': [model: PlantModel | null]
 }>()
 
-const { isRunning, stopSimulation, outputHistory, clearOutput } = useSimulation()
+const { outputHistory, clearOutput, currentCode } = useSimulationState()
+const { currentEntry, loadModel, getModelsByCategory } = useModelLoader()
+const runner = useSimulationRunner()
+const { toast } = useToast()
+
+// 仿真启动失败时显示错误
+watch(() => runner.error.value, (err) => {
+  if (err) toast(err, 'error')
+})
 
 const expanded = ref(false)
-const activeCategory = ref<PlantModel['category']>('linear')
-const currentModel = ref<PlantModel | null>(props.modelValue ?? null)
+const activeCategory = ref<ModelEntry['category']>('linear')
 
 const categories = [
   { id: 'linear' as const, label: '线性系统' },
@@ -27,14 +32,17 @@ const categories = [
 
 const models = computed(() => getModelsByCategory(activeCategory.value))
 
-function selectModel(m: PlantModel) {
-  currentModel.value = m
-  emit('update:modelValue', m)
+function selectModel(m: ModelEntry) {
+  void loadModel(m.id)
   expanded.value = false
 }
 
 function toggleSim() {
-  if (isRunning.value) stopSimulation()
+  if (runner.isRunning.value) {
+    runner.stop()
+  } else {
+    runner.start(currentCode.value)
+  }
 }
 
 function exportOutput() {
@@ -78,7 +86,7 @@ function exportOutput() {
         <span
           v-if="!expanded"
           class="absolute left-full ml-2 px-2 py-1 bg-bgBase text-textBase text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 border border-surfaceHover"
-        >模型{{ currentModel ? `: ${currentModel.name}` : '' }}</span>
+        >模型{{ currentEntry ? `: ${currentEntry.name}` : '' }}</span>
       </button>
 
       <div class="w-8 border-t border-surfaceHover my-1" />
@@ -86,14 +94,14 @@ function exportOutput() {
       <!-- 运行/停止 -->
       <button
         class="w-full h-12 flex items-center justify-center transition-colors relative group cursor-pointer"
-        :class="isRunning ? 'text-error hover:bg-error/10' : 'text-primary hover:bg-primary/10'"
+        :class="runner.isRunning.value ? 'text-error hover:bg-error/10' : 'text-primary hover:bg-primary/10'"
         @click="toggleSim"
       >
-        <span :class="isRunning ? 'i-carbon-stop-filled' : 'i-carbon-play-filled'" class="w-5 h-5" />
+        <span :class="runner.isRunning.value ? 'i-carbon-stop-filled' : 'i-carbon-play-filled'" class="w-5 h-5" />
         <span
           v-if="!expanded"
           class="absolute left-full ml-2 px-2 py-1 bg-bgBase text-textBase text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 border border-surfaceHover"
-        >{{ isRunning ? '停止' : '运行' }}</span>
+        >{{ runner.isRunning.value ? '停止' : '运行仿真' }}</span>
       </button>
 
       <!-- 导出 -->
@@ -158,7 +166,7 @@ function exportOutput() {
             v-for="m in models"
             :key="m.id"
             class="w-full text-left p-4 rounded-lg transition-colors cursor-pointer"
-            :class="currentModel?.id === m.id ? 'bg-primary/10 border border-primary/30' : 'bg-bgBase border border-surfaceHover hover:border-primary/50'"
+            :class="currentEntry?.id === m.id ? 'bg-primary/10 border border-primary/30' : 'bg-bgBase border border-surfaceHover hover:border-primary/50'"
             @click="selectModel(m)"
           >
             <div class="flex items-start gap-3">
@@ -178,9 +186,9 @@ function exportOutput() {
           </button>
           <div v-if="models.length === 0" class="text-center py-12 text-textMuted text-sm">暂无模型</div>
         </div>
-        <div v-if="currentModel" class="px-5 py-3 border-t border-surfaceHover shrink-0">
+        <div v-if="currentEntry" class="px-5 py-3 border-t border-surfaceHover shrink-0">
           <p class="text-textMuted text-xs">当前模型</p>
-          <p class="text-primary text-sm font-medium truncate mt-0.5">{{ currentModel.name }}</p>
+          <p class="text-primary text-sm font-medium truncate mt-0.5">{{ currentEntry.name }}</p>
         </div>
       </div>
     </Transition>

@@ -1,13 +1,6 @@
 import type { Graphics } from 'pixi.js'
-import type { Drawable, RenderContext, Vec2 } from '../types'
-import type { BallData, BlockData, GroundData, JointData, LinkData, SpringData } from './types'
-
-function drawLabel(g: Graphics, pos: Vec2, textWidth: number, ctx: RenderContext) {
-  const height = 18
-  g.roundRect(pos.x - textWidth / 2, pos.y - height - 8, textWidth, height, 4)
-    .fill({ color: ctx.theme.panelFill, alpha: 0.62 })
-    .stroke({ color: ctx.theme.bodyStroke, alpha: 0.18, width: 1 })
-}
+import type { Drawable, RenderContext } from '../types'
+import type { BallData, BlockData, GroundData, JointData, LinkData, SpringData, TankData } from './types'
 
 export function drawGround(g: Graphics, item: Drawable<GroundData>, ctx: RenderContext): void {
   const data = item.data
@@ -40,7 +33,6 @@ export function drawBlock(g: Graphics, item: Drawable<BlockData>, ctx: RenderCon
   g.roundRect(x + 6, y + 6, width - 12, height - 12, 3)
     .stroke({ color: ctx.theme.bodyStroke, alpha: 0.16, width: 1 })
 
-  if (ctx.toggles.showLabels && data.label) drawLabel(g, center, 34, ctx)
 }
 
 export function drawBall(g: Graphics, item: Drawable<BallData>, ctx: RenderContext): void {
@@ -55,7 +47,6 @@ export function drawBall(g: Graphics, item: Drawable<BallData>, ctx: RenderConte
   g.circle(center.x - radius * 0.26, center.y - radius * 0.3, Math.max(2, radius * 0.16))
     .fill({ color: ctx.theme.bodyStroke, alpha: 0.18 })
 
-  if (ctx.toggles.showLabels && data.label) drawLabel(g, center, 32, ctx)
 }
 
 export function drawSpring(g: Graphics, item: Drawable<SpringData>, ctx: RenderContext): void {
@@ -103,4 +94,33 @@ export function drawJoint(g: Graphics, item: Drawable<JointData>, ctx: RenderCon
     .fill({ color: ctx.theme.joint, alpha: 0.7 })
     .stroke({ color: ctx.theme.bodyStroke, alpha: 0.86, width: 1.3 })
   g.circle(center.x, center.y, Math.max(2, radius * 0.34)).fill({ color: ctx.theme.background, alpha: 0.9 })
+}
+
+export function drawTank(g: Graphics, item: Drawable<TankData>, ctx: RenderContext): void {
+  const data = item.data
+  const center = ctx.worldToScreen(data.center)
+  const width = ctx.worldLength(data.size.x)
+  const height = ctx.worldLength(data.size.y)
+  const x = center.x - width / 2
+  const y = center.y - height / 2
+  const level = Math.max(0, Math.min(1, data.level))
+
+  // 阴影
+  g.roundRect(x + 5, y + 6, width, height, 5).fill({ color: 0x000000, alpha: 0.14 })
+  // 外框
+  g.roundRect(x, y, width, height, 5)
+    .fill({ color: ctx.theme.bodyFill, alpha: 0.72 })
+    .stroke({ color: ctx.theme.bodyStroke, alpha: 0.82, width: 1.4 })
+  // 内框
+  g.roundRect(x + 4, y + 4, width - 8, height - 8, 3)
+    .stroke({ color: ctx.theme.bodyStroke, alpha: 0.16, width: 1 })
+
+  // 液位填充
+  if (level > 0) {
+    const fillHeight = (height - 8) * level
+    const fillY = y + height - 4 - fillHeight
+    g.roundRect(x + 4, fillY, width - 8, fillHeight, 2)
+      .fill({ color: ctx.theme.bodyAccent, alpha: 0.45 })
+  }
+
 }

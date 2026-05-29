@@ -39,3 +39,4 @@ __screenshots__/
 .codegraph/
 .vscode/settings.json
 .gitignore
+.codex

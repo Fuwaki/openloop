@@ -3,26 +3,50 @@ import type { SandboxFrame, SandboxScene } from '../types'
 export function createMassSpringScene(frame: SandboxFrame): SandboxScene {
   const x = frame.state.x ?? 0.35
   const v = frame.state.v ?? 0
-  const force = frame.state.force ?? -0.35
-  const blockCenter = { x, y: 0.28 }
+  const force = frame.state.F ?? 0
+  const blockSize = { x: 0.44, y: 0.36 }
+  const blockCenter = { x, y: 0.3 }
+  const blockLeft = x - blockSize.x / 2
+  const blockRight = x + blockSize.x / 2
+  const anchorX = -0.78
+  const springY = blockCenter.y
+  const forceVector = signedDisplayVector(force, 0.08, 0.38)
+  const velocityVector = signedDisplayVector(v, 0.35, 0.34)
+  const forceSign = Math.sign(forceVector) || 1
+  const velocitySign = Math.sign(velocityVector) || 1
 
   return {
     id: 'mass-spring',
     title: '质量-弹簧沙盒',
-    camera: { center: { x: 0.45, y: 0.42 }, scale: 170 },
+    camera: { center: { x: 0.08, y: 0.42 }, scale: 190 },
     objects: [
-      { id: 'ground', kind: 'ground', data: { y: 0, xMin: -1.1, xMax: 2.1, tick: 0.18 } },
-      { id: 'anchor', kind: 'joint', data: { center: { x: -0.85, y: 0.28 }, radius: 0.07 } },
-      { id: 'spring', kind: 'spring', data: { start: { x: -0.78, y: 0.28 }, end: { x: x - 0.22, y: 0.28 }, coils: 9 } },
-      { id: 'block', kind: 'block', data: { center: blockCenter, size: { x: 0.44, y: 0.36 }, label: 'm' } },
-      { id: 'pendulum-link', kind: 'link', data: { start: { x: 1.18, y: 0.92 }, end: { x: 1.42, y: 0.38 }, width: 4 } },
-      { id: 'pendulum-joint', kind: 'joint', data: { center: { x: 1.18, y: 0.92 }, radius: 0.055 } },
-      { id: 'pendulum-ball', kind: 'ball', data: { center: { x: 1.42, y: 0.38 }, radius: 0.11, label: 'b' } },
+      { id: 'ground', kind: 'ground', data: { y: 0, xMin: -1.05, xMax: 1.25, tick: 0.18 } },
+      { id: 'wall', kind: 'block', data: { center: { x: -0.92, y: 0.32 }, size: { x: 0.12, y: 0.62 } } },
+      { id: 'anchor', kind: 'joint', data: { center: { x: anchorX, y: springY }, radius: 0.045 } },
+      { id: 'spring', kind: 'spring', data: { start: { x: anchorX, y: springY }, end: { x: blockLeft, y: springY }, coils: 9, amplitude: 0.07 } },
+      { id: 'block', kind: 'block', data: { center: blockCenter, size: blockSize } },
     ],
     annotations: [
-      { id: 'force', kind: 'vector', data: { origin: { x: x + 0.22, y: 0.38 }, vector: { x: force, y: 0 }, label: 'F', scale: 0.75 } },
-      { id: 'velocity', kind: 'vector', data: { origin: { x, y: 0.58 }, vector: { x: v, y: 0 }, label: 'v', color: 0x9fb7ad, scale: 0.55 } },
-      { id: 'x-label', kind: 'scalarLabel', data: { position: { x: -0.2, y: 0.78 }, label: 'x =', value: `${x.toFixed(2)} m` } },
+      {
+        id: 'force',
+        kind: 'vector',
+        visible: Math.abs(forceVector) > 0.02,
+        data: {
+          origin: { x: forceSign > 0 ? blockRight + 0.04 : blockLeft - 0.04, y: blockCenter.y },
+          vector: { x: forceVector, y: 0 },
+        },
+      },
+      {
+        id: 'velocity',
+        kind: 'vector',
+        visible: Math.abs(velocityVector) > 0.02,
+        data: {
+          origin: { x: velocitySign > 0 ? x - 0.1 : x + 0.1, y: blockCenter.y + blockSize.y / 2 + 0.15 },
+          vector: { x: velocityVector, y: 0 },
+          color: 0x9fb7ad,
+        },
+      },
+      { id: 'x-label', kind: 'scalarLabel', data: { position: { x: -0.18, y: 0.82 }, label: 'x =', value: `${x.toFixed(2)} m` } },
     ],
     legend: [
       { id: 'spring', label: '弹簧', color: 0xb9c7c0 },
@@ -31,4 +55,10 @@ export function createMassSpringScene(frame: SandboxFrame): SandboxScene {
       { id: 'velocity', label: '速度', color: 0x9fb7ad },
     ],
   }
+}
+
+function signedDisplayVector(value: number, gain: number, maxLength: number): number {
+  if (!Number.isFinite(value)) return 0
+  const magnitude = Math.min(Math.abs(value) * gain, maxLength)
+  return Math.sign(value) * magnitude
 }

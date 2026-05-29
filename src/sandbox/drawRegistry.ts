@@ -2,8 +2,8 @@ import type { Graphics } from 'pixi.js'
 import type { DrawFn, Drawable, RenderContext } from './types'
 import { drawVector } from './annotations/draw'
 import type { VectorData } from './annotations/types'
-import { drawBall, drawBlock, drawGround, drawJoint, drawLink, drawSpring } from './primitives/draw'
-import type { BallData, BlockData, GroundData, JointData, LinkData, SpringData } from './primitives/types'
+import { drawBall, drawBlock, drawGround, drawJoint, drawLink, drawSpring, drawTank } from './primitives/draw'
+import type { BallData, BlockData, GroundData, JointData, LinkData, SpringData, TankData } from './primitives/types'
 
 type AnyDrawFn = (graphics: Graphics, item: Drawable, ctx: RenderContext) => void
 
@@ -20,6 +20,7 @@ register<SpringData>('spring', drawSpring)
 register<LinkData>('link', drawLink)
 register<JointData>('joint', drawJoint)
 register<VectorData>('vector', drawVector)
+register<TankData>('tank', drawTank)
 
 export function drawItem(graphics: Graphics, item: Drawable, ctx: RenderContext): void {
   if (item.visible === false) return

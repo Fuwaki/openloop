@@ -27,29 +27,12 @@ const views: ViewPreset[] = [
     layout: split('h', panel('editor'), panel('output')),
   },
   {
-    id: 'debug',
-    name: '调试',
-    description: '编辑器 + 输出 + 参数调节，边写边调',
-    icon: 'i-carbon-debug',
+    id: 'simulation',
+    name: '仿真',
+    description: '沙盒 + 图表 + 输出 + 参数，完整仿真工作区',
+    icon: 'i-carbon-play',
     layout: split('h',
-      split('v', panel('editor'), panel('output')),
-      panel('params'),
-    ),
-  },
-  {
-    id: 'analysis',
-    name: '分析',
-    description: '图表 + 参数，观察仿真结果和调参',
-    icon: 'i-carbon-chart-venn-diagram',
-    layout: split('h', panel('chart'), panel('params')),
-  },
-  {
-    id: 'full',
-    name: '全景',
-    description: '编辑器 + 图表 + 输出 + 参数，完整工作区',
-    icon: 'i-carbon-dashboard',
-    layout: split('h',
-      split('v', panel('editor'), panel('output')),
+      split('v', panel('sandbox'), panel('output')),
       split('v', panel('chart'), panel('params')),
     ),
   },
@@ -57,8 +40,4 @@ const views: ViewPreset[] = [
 
 export function getViewPresets(): ViewPreset[] {
   return views
-}
-
-export function getViewPresetById(id: string): ViewPreset | undefined {
-  return views.find((v) => v.id === id)
 }

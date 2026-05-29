@@ -4,7 +4,7 @@ import { usePyodide } from '../usePyodide'
 // Mock pyodide module — WASM can't run in Node
 vi.mock('pyodide', () => {
   let stdoutCallback: ((s: string) => void) | null = null
-  let stderrCallback: ((s: string) => void) | null = null
+  let _stderrCallback: ((s: string) => void) | null = null
 
   const mockPyodide = {
     runPython: vi.fn((code: string) => {
@@ -32,7 +32,7 @@ vi.mock('pyodide', () => {
       stdoutCallback = opts.batched ?? null
     }),
     setStderr: vi.fn((opts: { batched?: (s: string) => void }) => {
-      stderrCallback = opts.batched ?? null
+      _stderrCallback = opts.batched ?? null
     }),
   }
 
@@ -45,6 +45,7 @@ vi.mock('pyodide', () => {
 describe('usePyodide', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    usePyodide().reset()
   })
 
   it('初始状态正确', () => {
@@ -99,12 +100,12 @@ describe('usePyodide', () => {
     expect(result.error).toBeNull()
   })
 
-  it('runPython 捕获 print 输出', async () => {
+  it('runPython 不捕获 stdout（由调用方设置全局重定向）', async () => {
     const { init, runPython } = usePyodide()
     await init()
 
     const result = runPython("print('hello world')")
-    expect(result.stdout).toBe('hello world')
+    expect(result.stdout).toBe('')
     expect(result.error).toBeNull()
   })
 

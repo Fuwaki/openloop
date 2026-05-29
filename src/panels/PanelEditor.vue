@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import CodeEditor from '@/components/CodeEditor.vue'
-import { useSimulation } from '@/composables/useSimulation'
+import { useCodeExecutor } from '@/composables/useCodeExecutor'
+import { useSimulationState } from '@/composables/useSimulationState'
+import { useModelLoader } from '@/composables/useModelLoader'
 
 const props = withDefaults(defineProps<{
   language?: string
@@ -24,7 +26,22 @@ const emit = defineEmits<{
 }>()
 
 const code = ref(props.modelValue)
-const { runCode, isRunning, isPyodideReady, isPyodideLoading } = useSimulation()
+const { runOnce, isRunning, isPyodideReady, isPyodideLoading } = useCodeExecutor()
+const { currentCode, isSimulationRunning } = useSimulationState()
+const { starterCode } = useModelLoader()
+
+// 单向同步：编辑器 → 全局状态
+watch(code, (val) => {
+  currentCode.value = val
+}, { immediate: true })
+
+// 模型切换时更新编辑器代码（immediate 处理开屏默认模型）
+watch(starterCode, (newCode) => {
+  if (newCode) {
+    code.value = newCode
+    emit('update:modelValue', newCode)
+  }
+}, { immediate: true })
 
 function onUpdate(val: string) {
   code.value = val
@@ -32,7 +49,7 @@ function onUpdate(val: string) {
 }
 
 function onRun() {
-  runCode(code.value)
+  runOnce(code.value)
 }
 </script>
 
@@ -58,6 +75,8 @@ function onRun() {
       <CodeEditor
         :model-value="code"
         :language="language"
+        :read-only="isSimulationRunning"
+        read-only-message="仿真运行中，请停止仿真以编辑代码"
         @update:model-value="onUpdate"
       />
     </div>

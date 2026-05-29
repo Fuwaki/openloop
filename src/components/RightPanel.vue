@@ -1,15 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useSimulation } from '@/composables/useSimulation'
+import { useSimulationState } from '@/composables/useSimulationState'
+import { useModelLoader } from '@/composables/useModelLoader'
 
-const props = defineProps<{
-  modelName?: string
-  modelDescription?: string
-  modelParams?: Array<{ name: string; value: number }>
-  modelStates?: Array<{ name: string; value: number; unit?: string }>
-}>()
-
-const { isRunning } = useSimulation()
+const { currentPlant } = useModelLoader()
+const { currentState, solverStats, controllerStats } = useSimulationState()
 
 interface InspectorItem {
   label: string
@@ -22,38 +17,59 @@ const sections = computed(() => [
     id: 'model',
     title: '被控系统',
     icon: 'i-carbon-cube',
-    items: (props.modelName
-      ? [{ label: props.modelName, value: props.modelDescription ?? '' }]
+    items: (currentPlant.value
+      ? [{ label: currentPlant.value.name, value: currentPlant.value.description }]
       : [{ label: '未选择模型', value: '请在侧栏中选择被控模型' }]) as InspectorItem[],
   },
   {
     id: 'params',
     title: '模型参数',
     icon: 'i-carbon-settings-adjust',
-    items: (props.modelParams ?? []).map((p) => ({
-      label: p.name,
-      value: String(p.value),
-    })) as InspectorItem[],
+    items: (currentPlant.value
+      ? Object.entries(currentPlant.value.params).map(([name, value]) => ({
+          label: name,
+          value: Number(value).toFixed(3),
+        }))
+      : []) as InspectorItem[],
   },
   {
     id: 'states',
     title: '状态变量',
     icon: 'i-carbon-chart-line-data',
-    items: (props.modelStates ?? []).map((s) => ({
-      label: s.name,
-      value: `${s.value.toFixed(4)}${s.unit ? ' ' + s.unit : ''}`,
-      live: true,
-    })) as InspectorItem[],
+    items: (currentPlant.value && currentState.value
+      ? currentPlant.value.stateVars.map((v, i) => ({
+          label: v.name,
+          value: `${currentState.value![i]!.toFixed(4)}${v.unit ? ' ' + v.unit : ''}`,
+          live: true,
+        }))
+      : []) as InspectorItem[],
   },
   {
     id: 'sim',
-    title: '仿真配置',
+    title: '求解器',
     icon: 'i-carbon-timer',
-    items: [
-      { label: '状态', value: isRunning.value ? '运行中' : '就绪' },
-      { label: '步长', value: '0.01 s' },
-      { label: '求解器', value: 'RK4' },
-    ] as InspectorItem[],
+    items: (solverStats.value
+      ? [
+          { label: '算法', value: solverStats.value.solverId },
+          { label: '仿真时间', value: `${solverStats.value.simTime.toFixed(4)} s` },
+          { label: '步数', value: String(solverStats.value.stepCount) },
+          { label: '上一步', value: `${solverStats.value.wallTimeLastStep.toFixed(3)} ms` },
+          { label: '平均', value: `${solverStats.value.wallTimeAvg.toFixed(3)} ms` },
+          { label: '吞吐量', value: `${solverStats.value.stepsPerSecond.toFixed(0)} steps/s` },
+          { label: '总时间', value: `${solverStats.value.wallTimeTotal.toFixed(1)} ms` },
+        ]
+      : [{ label: '状态', value: '未运行' }]) as InspectorItem[],
+  },
+  {
+    id: 'controller',
+    title: 'Python 解释器',
+    icon: 'i-carbon-script',
+    items: (controllerStats.value
+      ? [
+          { label: '上次调用', value: `${controllerStats.value.lastCallTime.toFixed(3)} ms` },
+          { label: '平均', value: `${controllerStats.value.avgCallTime.toFixed(3)} ms` },
+        ]
+      : [{ label: '状态', value: '未运行' }]) as InspectorItem[],
   },
 ])
 </script>
@@ -84,7 +100,7 @@ const sections = computed(() => [
             <span class="text-textMuted text-xs shrink-0">{{ item.label }}</span>
             <div class="flex items-center gap-1.5 min-w-0">
               <span
-                v-if="item.live && isRunning"
+                v-if="item.live && solverStats?.stepCount"
                 class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0"
               />
               <span class="text-textBase text-xs font-mono truncate text-right">{{ item.value }}</span>

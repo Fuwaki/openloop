@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
-import { useSimulation } from '@/composables/useSimulation'
+import { useSimulationState } from '@/composables/useSimulationState'
+import { useSimulationRunner } from '@/composables/useSimulationRunner'
 
-const { outputHistory, clearOutput, isRunning } = useSimulation()
+const { outputHistory, clearOutput } = useSimulationState()
+const runner = useSimulationRunner()
+const isSimRunning = runner.isRunning
 
 const outputRef = ref<HTMLElement>()
 
@@ -28,7 +31,7 @@ watch(outputHistory, async () => {
     </div>
     <!-- 输出内容 -->
     <div ref="outputRef" class="flex-1 overflow-auto p-3 font-mono text-sm">
-      <div v-if="outputHistory.length === 0 && !isRunning" class="text-textMuted text-xs">
+      <div v-if="outputHistory.length === 0 && !isSimRunning" class="text-textMuted text-xs">
         点击「运行」执行代码
       </div>
       <div v-for="(line, i) in outputHistory" :key="i" class="whitespace-pre-wrap break-all">

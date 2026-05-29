@@ -55,6 +55,7 @@ export class SandboxRenderer {
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(host)
     this.resize()
+    requestAnimationFrame(() => this.resize())
   }
 
   destroy(): void {
@@ -76,6 +77,12 @@ export class SandboxRenderer {
     this.render()
   }
 
+  setSceneFrame(scene: SandboxScene, frame: SandboxFrame): void {
+    this.scene = scene
+    this.frame = frame
+    this.render()
+  }
+
   setToggles(toggles: Partial<SandboxToggles>): void {
     this.toggles = { ...this.toggles, ...toggles }
     this.render()
@@ -83,8 +90,10 @@ export class SandboxRenderer {
 
   private resize(): void {
     if (!this.app || !this.host) return
-    const width = Math.max(1, Math.floor(this.host.clientWidth))
-    const height = Math.max(1, Math.floor(this.host.clientHeight))
+    const rect = this.host.getBoundingClientRect()
+    const width = Math.max(1, Math.floor(rect.width || this.host.clientWidth))
+    const height = Math.max(1, Math.floor(rect.height || this.host.clientHeight))
+    if (width === this.viewport.width && height === this.viewport.height) return
     this.viewport = { width, height }
     this.app.renderer.resize(width, height)
     this.render()

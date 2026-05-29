@@ -15,10 +15,12 @@ const props = withDefaults(defineProps<{
   language?: string
   modelValue?: string
   readOnly?: boolean
+  readOnlyMessage?: string
 }>(), {
   language: 'python',
   modelValue: '',
   readOnly: false,
+  readOnlyMessage: 'Cannot edit in read-only editor',
 })
 
 const emit = defineEmits<{
@@ -36,6 +38,7 @@ onMounted(() => {
     language: props.language,
     theme: THEME_NAME,
     readOnly: props.readOnly,
+    readOnlyMessage: { value: props.readOnlyMessage },
     automaticLayout: true,
     minimap: { enabled: false },
     fontSize: 14,
@@ -60,6 +63,13 @@ watch(() => props.language, (lang) => {
   if (editor) {
     monaco.editor.setModelLanguage(editor.getModel()!, lang)
   }
+})
+
+watch(() => props.readOnly, (val) => {
+  editor?.updateOptions({
+    readOnly: val,
+    readOnlyMessage: { value: props.readOnlyMessage },
+  })
 })
 
 onBeforeUnmount(() => {

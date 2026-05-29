@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
+import { useModelLoader } from '@/composables/useModelLoader'
 
 export interface Param {
   name: string
@@ -28,13 +29,22 @@ const expandedIndex = ref<number | null>(null)
 const editingIndex = ref<number | null>(null)
 const editValue = ref('')
 const valueInputRef = ref<HTMLInputElement | null>(null)
+const { currentParams, currentPlant } = useModelLoader()
+
+watch(currentParams, (val) => {
+  localParams.value = val.map((p) => ({ ...p }))
+}, { deep: true, immediate: true })
 
 watch(() => props.params, (val) => {
+  if (currentParams.value.length > 0) return
   localParams.value = val.map((p) => ({ ...p }))
 }, { deep: true })
 
 function emitUpdate() {
-  emit('update:params', localParams.value.map((p) => ({ ...p })))
+  const nextParams = localParams.value.map((p) => ({ ...p, step: p.step ?? 0.01 }))
+  currentParams.value = nextParams
+  for (const param of nextParams) currentPlant.value?.setParam(param.name, param.value)
+  emit('update:params', nextParams)
 }
 
 function onSliderInput(p: Param, e: Event) {
