@@ -6,26 +6,18 @@ function readCssColor(name: string, fallback: string): string {
   return value || fallback
 }
 
-function cssHexToNumber(value: string): number {
-  const hex = value.replace('#', '').trim()
-  if (hex.length === 3) {
-    return Number.parseInt(hex.split('').map((c) => c + c).join(''), 16)
-  }
-  return Number.parseInt(hex.slice(0, 6), 16)
-}
-
 function cssRgbVarToNumber(value: string): number {
   const [r = 0, g = 0, b = 0] = value.split(/\s+/).map((part) => Number.parseInt(part, 10))
   return (r << 16) + (g << 8) + b
 }
 
 export function createSandboxTheme(): SandboxTheme {
-  const bgBase = cssHexToNumber(readCssColor('--c-bg-base', '#121212'))
-  const surface = cssHexToNumber(readCssColor('--c-bg-surface', '#1e1e1e'))
-  const surfaceHover = cssHexToNumber(readCssColor('--c-bg-surface-hover', '#2a2a2a'))
+  const bgBase = cssRgbVarToNumber(readCssColor('--c-bg-base', '18 18 18'))
+  const surface = cssRgbVarToNumber(readCssColor('--c-bg-surface', '30 30 30'))
+  const surfaceHover = cssRgbVarToNumber(readCssColor('--c-bg-surface-hover', '42 42 42'))
   const primary = cssRgbVarToNumber(readCssColor('--c-primary', '16 185 129'))
-  const text = cssHexToNumber(readCssColor('--c-text-base', '#e5e5e5'))
-  const textMuted = cssHexToNumber(readCssColor('--c-text-muted', '#888888'))
+  const text = cssRgbVarToNumber(readCssColor('--c-text-base', '229 229 229'))
+  const textMuted = cssRgbVarToNumber(readCssColor('--c-text-muted', '136 136 136'))
 
   return {
     background: bgBase,

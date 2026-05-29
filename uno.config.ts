@@ -10,15 +10,15 @@ export default defineConfig({
   ],
   theme: {
     colors: {
-      bgBase: 'var(--c-bg-base)',
-      surface: 'var(--c-bg-surface)',
-      surfaceHover: 'var(--c-bg-surface-hover)',
+      bgBase: 'rgb(var(--c-bg-base))',
+      surface: 'rgb(var(--c-bg-surface))',
+      surfaceHover: 'rgb(var(--c-bg-surface-hover))',
       primary: 'rgb(var(--c-primary))',
       primaryDim: 'rgba(var(--c-primary-dim), 0.2)',
-      textBase: 'var(--c-text-base)',
-      textMuted: 'var(--c-text-muted)',
-      error: 'var(--c-error)',
-      warning: 'var(--c-warning)',
+      textBase: 'rgb(var(--c-text-base))',
+      textMuted: 'rgb(var(--c-text-muted))',
+      error: 'rgb(var(--c-error))',
+      warning: 'rgb(var(--c-warning))',
     }
   }
 })

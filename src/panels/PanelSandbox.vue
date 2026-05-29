@@ -119,8 +119,8 @@ onBeforeUnmount(() => {
         class="absolute inset-0 flex items-center justify-center pointer-events-none"
       >
         <div class="text-center text-textMuted">
-          <span class="i-carbon-cube text-3xl block mb-2 opacity-40" />
-          <p class="text-xs">{{ hasScene ? '请运行仿真以查看沙盒' : '当前模型不支持沙盒可视化' }}</p>
+          <span class="i-carbon-cube text-3xl block mx-auto mb-2 opacity-40" />
+          <p class="text-xs m-0">{{ hasScene ? '请运行仿真以查看沙盒' : '当前模型不支持沙盒可视化' }}</p>
         </div>
       </div>
     </div>
@@ -130,7 +130,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .sandbox-host {
   overflow: hidden;
-  background: var(--c-bg-base);
+  background: rgb(var(--c-bg-base));
 }
 
 .sandbox-toggle {
@@ -139,14 +139,14 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--c-bg-surface-hover);
+  border: 1px solid rgb(var(--c-bg-surface-hover));
   border-radius: 6px;
-  color: var(--c-text-muted);
+  color: rgb(var(--c-text-muted));
   cursor: pointer;
 }
 
 .sandbox-toggle:hover {
-  color: var(--c-text-base);
+  color: rgb(var(--c-text-base));
   border-color: rgb(var(--c-primary));
 }
 

@@ -444,10 +444,14 @@ function renderSignalPlot() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
   const styles = getComputedStyle(document.documentElement)
-  const bg = styles.getPropertyValue('--c-bg-base').trim() || '#121212'
-  const grid = styles.getPropertyValue('--c-bg-surface-hover').trim() || '#2a2a2a'
-  const text = styles.getPropertyValue('--c-text-muted').trim() || '#888888'
-  const textBase = styles.getPropertyValue('--c-text-base').trim() || '#e5e5e5'
+  const rgbVar = (name: string, fallback: string) => {
+    const raw = styles.getPropertyValue(name).trim() || fallback
+    return raw.includes(' ') ? `rgb(${raw})` : raw
+  }
+  const bg = rgbVar('--c-bg-base', '18 18 18')
+  const grid = rgbVar('--c-bg-surface-hover', '42 42 42')
+  const text = rgbVar('--c-text-muted', '136 136 136')
+  const textBase = rgbVar('--c-text-base', '229 229 229')
 
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = bg

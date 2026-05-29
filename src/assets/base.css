@@ -1,21 +1,21 @@
 /* 设计 token — 所有颜色统一在这里管理 */
 :root {
-  /* 基础背景色系 (黑/深灰) */
-  --c-bg-base: #121212;
-  --c-bg-surface: #1e1e1e;
-  --c-bg-surface-hover: #2a2a2a;
+  /* 基础背景色系 (黑/深灰) — RGB 三元组，配合 UnoCSS 透明度工具类 */
+  --c-bg-base: 18 18 18;
+  --c-bg-surface: 30 30 30;
+  --c-bg-surface-hover: 42 42 42;
 
   /* 品牌/强调色 — RGB 三元组，配合 UnoCSS 透明度工具类 */
   --c-primary: 16 185 129;
   --c-primary-dim: 16 185 129;
 
-  /* 文字色系 */
-  --c-text-base: #e5e5e5;
-  --c-text-muted: #888888;
+  /* 文字色系 — RGB 三元组 */
+  --c-text-base: 229 229 229;
+  --c-text-muted: 136 136 136;
 
-  /* 状态色 */
-  --c-error: #ef4444;
-  --c-warning: #f59e0b;
+  /* 状态色 — RGB 三元组，配合 UnoCSS 透明度工具类 */
+  --c-error: 239 68 68;
+  --c-warning: 245 158 11;
 }
 
 *,
@@ -27,8 +27,8 @@
 
 body {
   min-height: 100vh;
-  background-color: var(--c-bg-base);
-  color: var(--c-text-base);
+  background-color: rgb(var(--c-bg-base));
+  color: rgb(var(--c-text-base));
   line-height: 1.6;
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -46,12 +46,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--c-bg-surface-hover);
+  background: rgb(var(--c-bg-surface-hover));
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--c-text-muted);
+  background: rgb(var(--c-text-muted));
 }
 
 ::-webkit-scrollbar-corner {

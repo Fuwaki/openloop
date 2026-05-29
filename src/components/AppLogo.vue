@@ -20,10 +20,10 @@ withDefaults(
       fill="none"
     >
       <g stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M 4 16 L 12 16" stroke="#E5E5E5" />
-        <rect x="12" y="9" width="14" height="14" rx="2" stroke="#10B981" />
-        <path d="M 26 16 L 36 16" stroke="#E5E5E5" />
-        <path d="M 32 13 L 36 16 L 32 19" stroke="#E5E5E5" />
+        <path d="M 4 16 L 12 16" class="stroke-textBase" />
+        <rect x="12" y="9" width="14" height="14" rx="2" class="stroke-primary" />
+        <path d="M 26 16 L 36 16" class="stroke-textBase" />
+        <path d="M 32 13 L 36 16 L 32 19" class="stroke-textBase" />
       </g>
 
       <text
@@ -35,7 +35,7 @@ withDefaults(
         font-weight="600"
         letter-spacing="0.5"
       >
-        <tspan fill="#E5E5E5">Open</tspan><tspan fill="#10B981">Loop</tspan>
+        <tspan class="fill-textBase">Open</tspan><tspan class="fill-primary">Loop</tspan>
       </text>
     </svg>
   </div>

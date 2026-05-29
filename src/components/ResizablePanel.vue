@@ -20,7 +20,7 @@ defineProps<{
 
 <style>
 .splitpanes__splitter {
-  background-color: var(--c-bg-surface-hover);
+  background-color: rgb(var(--c-bg-surface-hover));
   position: relative;
 }
 
@@ -30,7 +30,7 @@ defineProps<{
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: var(--c-text-muted);
+  background-color: rgb(var(--c-text-muted));
   border-radius: 2px;
 }
 
@@ -47,6 +47,6 @@ defineProps<{
 }
 
 .splitpanes__splitter:hover::before {
-  background-color: var(--c-primary);
+  background-color: rgb(var(--c-primary));
 }
 </style>
