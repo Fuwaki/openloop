@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useSimulation } from '@/composables/useSimulation'
 import { getModelsByCategory, type PlantModel } from '@/models/registry'
+import AppLogo from './AppLogo.vue'
 
 const props = defineProps<{
   modelValue?: PlantModel | null
@@ -58,7 +59,7 @@ function exportOutput() {
     <!-- 图标栏 -->
     <div class="w-16 h-full flex flex-col items-center shrink-0">
       <div class="w-full h-14 flex items-center justify-center relative group">
-        <span class="text-primary text-lg font-bold select-none">OL</span>
+        <AppLogo :size="28" />
         <span
           v-if="!expanded"
           class="absolute left-full ml-2 px-2 py-1 bg-bgBase text-textBase text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 border border-surfaceHover"
