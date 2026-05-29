@@ -1,0 +1,37 @@
+import type * as monaco from 'monaco-editor'
+
+export const OPENLOOP_LIGHT: monaco.editor.IStandaloneThemeData = {
+  base: 'vs',
+  inherit: true,
+  rules: [
+    { token: 'comment', foreground: '666666', fontStyle: 'italic' },
+    { token: 'keyword', foreground: '059669' },
+    { token: 'string', foreground: 'd97706' },
+    { token: 'number', foreground: 'd97706' },
+    { token: 'type', foreground: '059669' },
+    { token: 'function', foreground: '1a1a1a' },
+    { token: 'variable', foreground: '1a1a1a' },
+    { token: 'operator', foreground: '059669' },
+  ],
+  colors: {
+    'editor.background': '#f5f5f5',
+    'editor.foreground': '#1a1a1a',
+    'editor.lineHighlightBackground': '#eeeeee',
+    'editor.selectionBackground': '#10b98133',
+    'editor.inactiveSelectionBackground': '#10b9811a',
+    'editorCursor.foreground': '#059669',
+    'editorLineNumber.foreground': '#999999',
+    'editorLineNumber.activeForeground': '#1a1a1a',
+    'editorIndentGuide.background': '#e0e0e0',
+    'editorIndentGuide.activeBackground': '#999999',
+    'editor.selectionHighlightBackground': '#10b9811a',
+    'editorBracketMatch.background': '#10b98133',
+    'editorBracketMatch.border': '#059669',
+    'editorGutter.background': '#f5f5f5',
+    'scrollbar.shadow': '#00000000',
+    'scrollbarSlider.background': '#e0e0e080',
+    'scrollbarSlider.hoverBackground': '#99999980',
+    'scrollbarSlider.activeBackground': '#999999',
+    'minimap.background': '#f5f5f5',
+  },
+}

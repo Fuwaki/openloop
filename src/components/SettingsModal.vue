@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import AppLogo from './AppLogo.vue'
+import UiToggle from './ui/UiToggle.vue'
+import { useTheme } from '@/composables/useTheme'
 
 defineEmits<{
   close: []
 }>()
+
+const { hue, isDark, setHue, toggleDark } = useTheme()
 
 const tabs = [
   { id: 'general', label: '常规', icon: 'i-carbon-settings-adjust' },
@@ -15,10 +19,20 @@ const tabs = [
 
 const activeTab = ref('general')
 
+const huePresets = [
+  { h: 0, label: '红' },
+  { h: 30, label: '橙' },
+  { h: 55, label: '黄' },
+  { h: 160, label: '绿' },
+  { h: 190, label: '青' },
+  { h: 220, label: '蓝' },
+  { h: 270, label: '紫' },
+  { h: 330, label: '粉' },
+]
+
 // 模拟设置数据
 const settings = ref({
   language: 'zh-CN',
-  theme: 'dark',
   simStep: 0.01,
   simTimeout: 30,
   autoRun: false,
@@ -79,15 +93,49 @@ const settings = ref({
                 <option value="en">English</option>
               </select>
             </div>
-            <div class="space-y-1.5">
-              <label class="text-textBase text-xs font-medium">主题</label>
-              <select
-                v-model="settings.theme"
-                class="w-full bg-bgBase text-textBase text-sm px-3 py-2 rounded-lg border border-surfaceHover focus:border-primary outline-none"
-              >
-                <option value="dark">深色</option>
-                <option value="light">浅色</option>
-              </select>
+            <div class="space-y-2">
+              <label class="text-textBase text-xs font-medium">主题色</label>
+              <div class="flex items-center gap-2.5">
+                <button
+                  v-for="preset in huePresets"
+                  :key="preset.h"
+                  class="w-7 h-7 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center"
+                  :class="hue === preset.h ? 'border-textBase scale-110' : 'border-transparent hover:border-textMuted'"
+                  :style="{ backgroundColor: `hsl(${preset.h}, 70%, 50%)` }"
+                  :title="preset.label"
+                  @click="setHue(preset.h)"
+                >
+                  <span
+                    v-if="hue === preset.h"
+                    class="w-2 h-2 rounded-full bg-white/90"
+                  />
+                </button>
+              </div>
+              <div class="flex items-center gap-3">
+                <div
+                  class="flex-1 h-4 rounded-full relative"
+                  style="background: linear-gradient(to right, hsl(0,70%,50%), hsl(60,70%,50%), hsl(120,70%,50%), hsl(180,70%,50%), hsl(240,70%,50%), hsl(300,70%,50%), hsl(360,70%,50%))"
+                >
+                  <input
+                    type="range"
+                    :value="hue"
+                    min="0"
+                    max="359"
+                    step="1"
+                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    @input="setHue(+($event.target as HTMLInputElement).value)"
+                  />
+                  <div
+                    class="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 border-white shadow-md pointer-events-none"
+                    :style="{ left: `calc(${hue / 359 * 100}% - 10px)`, backgroundColor: `hsl(${hue}, 70%, 50%)` }"
+                  />
+                </div>
+                <span class="text-textMuted text-xs font-mono w-7 text-right">{{ hue }}°</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="text-textBase text-xs font-medium">深色模式</label>
+              <UiToggle :model-value="isDark" @update:model-value="toggleDark()" />
             </div>
           </template>
 
@@ -114,16 +162,7 @@ const settings = ref({
             </div>
             <div class="flex items-center justify-between">
               <label class="text-textBase text-xs font-medium">代码变更后自动运行</label>
-              <button
-                class="w-10 h-5 rounded-full transition-colors cursor-pointer relative"
-                :class="settings.autoRun ? 'bg-primary' : 'bg-surfaceHover'"
-                @click="settings.autoRun = !settings.autoRun"
-              >
-                <span
-                  class="absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform"
-                  :class="settings.autoRun ? 'translate-x-5' : 'translate-x-0.5'"
-                />
-              </button>
+              <UiToggle v-model="settings.autoRun" />
             </div>
           </template>
 
