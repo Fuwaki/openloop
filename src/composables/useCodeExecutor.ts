@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import { usePyodide, type RunResult } from './usePyodide'
-import { clearOutput, appendOutput } from './useSimulationState'
+import { clearOutput, appendOutput, currentCode } from './useSimulationState'
+import { injectOpenLoop, clearOpenLoop, updateParamValues } from './useOpenLoopModule'
+import { userParams } from './useUserParams'
 
 const pyodide = usePyodide()
 
@@ -20,18 +22,21 @@ function setupGlobalCapture() {
 
 async function ensureInit() {
   if (initialized) return
-  initialized = true
   await pyodide.init()
-  setupGlobalCapture()
+  if (pyodide.isReady.value) {
+    initialized = true
+    setupGlobalCapture()
+  }
 }
 
 /**
  * 执行一次 Python 代码（编辑器 "运行" 按钮使用）。
  * 与 useSimulationRunner 的持续仿真循环不同，这里只运行一次。
+ * 从 currentCode 读取最新代码，保证与仿真运行器使用同一份代码。
  *
  * stdout/stderr 通过全局捕获自动进入 outputHistory。
  */
-async function runOnce(code: string): Promise<RunResult | undefined> {
+async function runOnce(): Promise<RunResult | undefined> {
   isRunning.value = true
   abortFlag = false
   clearOutput()
@@ -52,17 +57,34 @@ async function runOnce(code: string): Promise<RunResult | undefined> {
   // 确保全局捕获已设置（可能被 useControllerBridge 覆盖后需要重新设置）
   setupGlobalCapture()
 
-  const result = await pyodide.runPythonAsync(code)
+  try {
+    // 注入 openloop 模块（用户代码可能 import openloop）
+    await injectOpenLoop()
+    clearOpenLoop()
 
-  // stdout/stderr 通过全局捕获自动进入 outputHistory
-  // 这里只处理 result 和 error
-  if (result.error) appendOutput({ type: 'error', text: result.error })
-  if (result.result !== null && result.result !== undefined && !result.error) {
-    appendOutput({ type: 'result', text: String(result.result) })
+    // 注入当前滑块值，让 parameter() 返回滑块值而非默认值
+    if (userParams.value.length > 0) {
+      const vals: Record<string, number> = {}
+      for (const p of userParams.value) vals[p.name] = p.value
+      updateParamValues(vals)
+    }
+
+    const result = await pyodide.runPythonAsync(currentCode.value)
+
+    // stdout/stderr 通过全局捕获自动进入 outputHistory
+    // 这里只处理 result 和 error
+    if (result.error) appendOutput({ type: 'error', text: result.error })
+    if (result.result !== null && result.result !== undefined && !result.error) {
+      appendOutput({ type: 'result', text: String(result.result) })
+    }
+
+    isRunning.value = false
+    return result
+  } catch (e) {
+    appendOutput({ type: 'error', text: `执行失败: ${e instanceof Error ? e.message : String(e)}` })
+    isRunning.value = false
+    return undefined
   }
-
-  isRunning.value = false
-  return result
 }
 
 function stop() {

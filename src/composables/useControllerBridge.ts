@@ -19,6 +19,7 @@ const pyodide = usePyodide()
 const controller = shallowRef<ControllerFn | null>(null)
 const error = ref<string | null>(null)
 const isReady = ref(false)
+let controllerProxy: ReturnType<NonNullable<typeof pyodide.pyodide.value>['globals']['get']> | null = null
 
 /**
  * 加载 Python 代码并提取 controller 函数。
@@ -28,6 +29,10 @@ async function load(code: string): Promise<boolean> {
   error.value = null
   controller.value = null
   isReady.value = false
+  if (controllerProxy) {
+    controllerProxy.destroy()
+    controllerProxy = null
+  }
 
   // 确保 Pyodide 已初始化
   if (!pyodide.isReady.value) {
@@ -66,6 +71,7 @@ async function load(code: string): Promise<boolean> {
 
   try {
     const fn = py.globals.get('controller')
+    controllerProxy = fn
     if (typeof fn !== 'function') {
       const msg = '未找到 controller 函数，请确保定义了 def controller(state, t): ...'
       error.value = msg
@@ -106,6 +112,10 @@ function unload() {
   controller.value = null
   isReady.value = false
   error.value = null
+  if (controllerProxy) {
+    controllerProxy.destroy()
+    controllerProxy = null
+  }
 }
 
 export function useControllerBridge() {

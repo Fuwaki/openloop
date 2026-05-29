@@ -1,7 +1,9 @@
 import { ref } from 'vue'
 import { useControllerBridge } from './useControllerBridge'
-import { isSimulationRunning, beginRun, updateFrame, resetRuntime, clearOutput, type ControllerStats } from './useSimulationState'
+import { currentCode, isSimulationRunning, isSimulationPaused, beginRun, updateFrame, resetRuntime, clearOutput, type ControllerStats } from './useSimulationState'
 import { useModelLoader } from './useModelLoader'
+import { injectOpenLoop, updateParamValues, clearOpenLoop } from './useOpenLoopModule'
+import { userParams } from './useUserParams'
 import { createMeasuredSolver } from '@/simulation/solver-stats'
 import { rk4Solver } from '@/simulation/solvers/rk4'
 
@@ -20,6 +22,7 @@ const bridge = useControllerBridge()
 const { currentPlant } = useModelLoader()
 
 const isRunning = isSimulationRunning
+const isPaused = isSimulationPaused
 const error = ref<string | null>(null)
 
 const measured = createMeasuredSolver(rk4Solver, 'RK4')
@@ -37,15 +40,25 @@ const ctrlStats: ControllerStats = { lastCallTime: 0, avgCallTime: 0 }
 
 /**
  * 启动仿真。
- * @param code 用户 Python 代码（必须定义 controller 函数）
+ * 从 currentCode 读取最新代码，保证与编辑器运行使用同一份代码。
  */
-async function start(code: string) {
+async function start() {
+  if (isPaused.value) { resume(); return }
   if (isRunning.value) return
   error.value = null
   clearOutput()
 
+  // 注入 openloop 模块并清空旧状态
+  try {
+    await injectOpenLoop()
+    clearOpenLoop()
+  } catch (e) {
+    error.value = `模块注入失败: ${e instanceof Error ? e.message : String(e)}`
+    return
+  }
+
   // 加载 controller
-  const ok = await bridge.load(code)
+  const ok = await bridge.load(currentCode.value)
   if (!ok) {
     error.value = bridge.error.value
     return
@@ -69,12 +82,23 @@ async function start(code: string) {
   ctrlStats.lastCallTime = 0
   ctrlStats.avgCallTime = 0
 
-  // 仿真循环
-  function tick() {
-    if (!isRunning.value || !state) return
+  rafId = requestAnimationFrame(tick)
+}
 
-    const plant = currentPlant.value
-    if (!plant || plant.id !== startPlantId) { stop(); return }
+// 仿真循环 — 模块级，供 start / resume 共用
+function tick() {
+  if (!isRunning.value || isPaused.value || !state) return
+
+  const plant = currentPlant.value
+  if (!plant || plant.id !== startPlantId) { stop(); return }
+
+  try {
+    // 0. 同步用户参数到 openloop 模块
+    if (userParams.value.length > 0) {
+      const vals: Record<string, number> = {}
+      for (const p of userParams.value) vals[p.name] = p.value
+      updateParamValues(vals)
+    }
 
     // 1. 调用 Python controller（计时）
     const ctrlStart = performance.now()
@@ -84,23 +108,36 @@ async function start(code: string) {
     ctrlWindow.push(ctrlElapsed)
     ctrlWindowSum += ctrlElapsed
     if (ctrlWindow.length > CTRL_WINDOW) {
-      ctrlWindowSum -= ctrlWindow.shift()!
+      const shifted = ctrlWindow.shift()
+      if (shifted !== undefined) ctrlWindowSum -= shifted
     }
     ctrlStats.lastCallTime = ctrlElapsed
-    ctrlStats.avgCallTime = ctrlWindowSum / ctrlWindow.length
+    ctrlStats.avgCallTime = ctrlWindow.length > 0 ? ctrlWindowSum / ctrlWindow.length : 0
 
     // 2. 求解器推进一步
     const input = new Float64Array([u])
     state = measured.step(plant, t, state, input, dt)
 
-    // 3. 计算中间变量
-    const intermediates = plant.intermediates(t, state, input)
+    // 检测数值发散
+    for (let i = 0; i < state.length; i++) {
+      if (!Number.isFinite(state[i])) {
+        error.value = `数值发散: state[${i}] = ${state[i]}，仿真已停止`
+        stop()
+        return
+      }
+    }
+
+    // 3. 计算中间变量（使用更新后的时间 t + dt）
+    const intermediates = plant.intermediates(t + dt, state, input)
 
     // 4. 更新 UI 状态
     updateFrame(state, input, intermediates, { ...measured.stats }, { ...ctrlStats })
 
     t += dt
-    rafId = requestAnimationFrame(tick)
+  } catch (e) {
+    error.value = `仿真错误: ${e instanceof Error ? e.message : String(e)}`
+    stop()
+    return
   }
 
   rafId = requestAnimationFrame(tick)
@@ -108,6 +145,7 @@ async function start(code: string) {
 
 function stop() {
   isRunning.value = false
+  isPaused.value = false
   if (rafId) {
     cancelAnimationFrame(rafId)
     rafId = 0
@@ -115,12 +153,30 @@ function stop() {
   resetRuntime()
 }
 
+function pause() {
+  if (!isRunning.value || isPaused.value) return
+  isPaused.value = true
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = 0
+  }
+}
+
+function resume() {
+  if (!isRunning.value || !isPaused.value) return
+  isPaused.value = false
+  rafId = requestAnimationFrame(tick)
+}
+
 export function useSimulationRunner() {
   return {
     isRunning,
+    isPaused,
     error,
     stats: measured.stats,
     start,
     stop,
+    pause,
+    resume,
   }
 }

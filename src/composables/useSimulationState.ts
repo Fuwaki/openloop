@@ -40,9 +40,13 @@ const simulationRunId = ref(0)
 /** 仿真是否正在运行 */
 const isSimulationRunning = ref(false)
 
+/** 仿真是否暂停 */
+const isSimulationPaused = ref(false)
+
 /** 重置运行时状态（模型切换或仿真停止时调用） */
 function resetRuntime() {
   isSimulationRunning.value = false
+  isSimulationPaused.value = false
   currentState.value = null
   currentInput.value = null
   currentIntermediates.value = null
@@ -51,13 +55,9 @@ function resetRuntime() {
 }
 
 function beginRun() {
+  resetRuntime()
   simulationRunId.value++
   isSimulationRunning.value = true
-  currentState.value = null
-  currentInput.value = null
-  currentIntermediates.value = null
-  solverStats.value = null
-  controllerStats.value = null
 }
 
 function updateFrame(
@@ -82,12 +82,13 @@ function clearOutput() {
   outputHistory.value = []
 }
 
-export { isSimulationRunning, beginRun, updateFrame, clearOutput, appendOutput, resetRuntime }
+export { currentCode, isSimulationRunning, isSimulationPaused, beginRun, updateFrame, clearOutput, appendOutput, resetRuntime }
 
 export function useSimulationState() {
   return {
     currentCode,
     isSimulationRunning,
+    isSimulationPaused,
     currentState,
     currentInput,
     currentIntermediates,

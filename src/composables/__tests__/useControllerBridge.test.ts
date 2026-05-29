@@ -3,12 +3,12 @@ import { useControllerBridge } from '../useControllerBridge'
 
 // Mock pyodide — 模拟 globals.get('controller') 返回 Python 函数
 vi.mock('pyodide', () => {
-  const mockController = vi.fn((state: Float64Array, _t: number) => {
+  const mockController = Object.assign(vi.fn((state: Float64Array, _t: number) => {
     // 模拟简单 PD 控制器
     const x = state[0] ?? 0
     const v = state[1] ?? 0
     return -10 * x - 2 * v
-  })
+  }), { destroy: vi.fn() })
 
   const mockPyodide = {
     runPython: vi.fn(() => undefined),
