@@ -1,5 +1,6 @@
 import type { PlantModel as SimPlant } from '@/simulation/plants/types'
 import type { SandboxFrame, SandboxScene } from '@/sandbox/types'
+import type { SystemTag, VarTag } from './tags'
 import { createMassSpring } from '@/simulation/plants/massSpring'
 import { createFirstOrder } from '@/simulation/plants/firstOrder'
 import { createInvertedPendulum } from '@/simulation/plants/invertedPendulum'
@@ -16,6 +17,23 @@ export interface ParamDef {
   step: number
 }
 
+/** 单个变量的描述 */
+export interface VarSpec {
+  name: string
+  unit: string
+  description: string
+  /** 语义/导数层级标签，用于与控制器匹配 */
+  tags: VarTag[]
+}
+
+/** 模型 I/O 元数据 */
+export interface IOSpec {
+  /** 状态变量（即 controller 的输入） */
+  stateVars: VarSpec[]
+  /** 控制输出变量 */
+  outputs: VarSpec[]
+}
+
 /** 模型表条目 */
 export interface ModelEntry {
   id: string
@@ -24,82 +42,15 @@ export interface ModelEntry {
   description: string
   icon: string
   params: ParamDef[]
+  /** 系统级标签 */
+  systemTags: SystemTag[]
+  /** I/O 元数据，用于代码生成 */
+  ioSpec: IOSpec
   /** 创建仿真用 PlantModel */
   createPlant: (params?: Record<string, number>) => SimPlant
   /** 创建沙盒场景（可选） */
   createScene?: (frame: SandboxFrame, params: Record<string, number>) => SandboxScene
-  /** 编辑器 starter 代码 */
-  starterCode: string
 }
-
-// ── Starter Code ──
-
-const massSpringCode = `import numpy as np
-
-# 质量-弹簧-阻尼系统控制器
-# 微分方程: mẍ + cẋ + kx = F
-# 状态: [x, v] — 位置 (m)、速度 (m/s)
-# 输出: F — 外力 (N)
-
-def controller(state, t):
-    x, v = state
-
-    # PID 控制器示例
-    Kp = 10.0
-    Ki = 1.0
-    Kd = 2.0
-
-    # 目标位置
-    x_ref = 0.0
-
-    # TODO: 在这里实现你的控制算法
-    error = x_ref - x
-    F = Kp * error - Kd * v
-
-    return F
-`
-
-const firstOrderCode = `import numpy as np
-
-# 一阶惯性系统控制器
-# 微分方程: τ ẋ + x = K·u
-# 状态: [x] — 输出
-# 输出: u — 控制输入
-
-def controller(state, t):
-    x = state[0]
-
-    # 目标值
-    x_ref = 1.0
-
-    # TODO: 在这里实现你的控制算法
-    Kp = 3.0
-
-    error = x_ref - x
-    u = Kp * error
-
-    return u
-`
-
-const invertedPendulumCode = `import numpy as np
-
-# 倒立摆控制器
-# 状态: [x, v, θ, ω] — 小车位置 (m)、速度 (m/s)、摆杆角度 (rad)、角速度 (rad/s)
-# 输出: F — 水平力 (N)
-
-def controller(state, t):
-    x, v, theta, omega = state
-
-    # LQR 增益示例（小角度近似）
-    K = np.array([1.0, 1.5, 30.0, 5.0])
-    x_ref = np.array([0, 0, 0, 0])
-
-    # TODO: 在这里实现你的控制算法
-    error = x_ref - state
-    F = -K @ error
-
-    return F
-`
 
 // ── 默认模型 ──
 
@@ -119,9 +70,18 @@ const modelTable: ModelEntry[] = [
       { name: 'c', value: 0.5, min: 0, max: 5, step: 0.1 },
       { name: 'k', value: 2, min: 0.1, max: 20, step: 0.1 },
     ],
+    systemTags: ['linear'],
+    ioSpec: {
+      stateVars: [
+        { name: 'x', unit: 'm', description: '位置', tags: ['position', 'derivative:0'] },
+        { name: 'v', unit: 'm/s', description: '速度', tags: ['velocity', 'derivative:1'] },
+      ],
+      outputs: [
+        { name: 'F', unit: 'N', description: '外力', tags: [] },
+      ],
+    },
     createPlant: (p) => createMassSpring(p as { m?: number; c?: number; k?: number }),
     createScene: (frame) => createMassSpringScene(frame),
-    starterCode: massSpringCode,
   },
   {
     id: 'first-order',
@@ -133,9 +93,17 @@ const modelTable: ModelEntry[] = [
       { name: 'τ', value: 1, min: 0.1, max: 10, step: 0.1 },
       { name: 'K', value: 1, min: 0.1, max: 10, step: 0.1 },
     ],
+    systemTags: ['linear'],
+    ioSpec: {
+      stateVars: [
+        { name: 'x', unit: '', description: '输出', tags: ['output', 'derivative:0'] },
+      ],
+      outputs: [
+        { name: 'u', unit: '', description: '控制输入', tags: [] },
+      ],
+    },
     createPlant: (p) => createFirstOrder(p as { tau?: number; K?: number }),
     createScene: (frame, p) => createFirstOrderScene(frame, p),
-    starterCode: firstOrderCode,
   },
   {
     id: 'inverted-pendulum',
@@ -148,9 +116,20 @@ const modelTable: ModelEntry[] = [
       { name: 'm', value: 0.2, min: 0.05, max: 2, step: 0.05 },
       { name: 'l', value: 0.3, min: 0.1, max: 2, step: 0.05 },
     ],
+    systemTags: ['nonlinear'],
+    ioSpec: {
+      stateVars: [
+        { name: 'x', unit: 'm', description: '小车位置', tags: ['position', 'derivative:0'] },
+        { name: 'v', unit: 'm/s', description: '小车速度', tags: ['velocity', 'derivative:1'] },
+        { name: 'theta', unit: 'rad', description: '摆杆角度', tags: ['angle', 'derivative:0'] },
+        { name: 'omega', unit: 'rad/s', description: '摆杆角速度', tags: ['angular-velocity', 'derivative:1'] },
+      ],
+      outputs: [
+        { name: 'F', unit: 'N', description: '水平力', tags: [] },
+      ],
+    },
     createPlant: (p) => createInvertedPendulum(p as { M?: number; m?: number; l?: number; g?: number }),
     createScene: (frame, p) => createInvertedPendulumScene(frame, p),
-    starterCode: invertedPendulumCode,
   },
 ]
 
