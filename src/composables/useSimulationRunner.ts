@@ -1,11 +1,14 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useControllerBridge } from './useControllerBridge'
-import { currentCode, isSimulationRunning, isSimulationPaused, beginRun, updateFrame, resetRuntime, clearOutput, type ControllerStats } from './useSimulationState'
+import { currentCode, isSimulationRunning, isSimulationPaused, controllerStatusNames, beginRun, updateFrame, resetRuntime, clearOutput, type ControllerStats } from './useSimulationState'
 import { useModelLoader } from './useModelLoader'
-import { injectOpenLoop, updateParamValues, clearOpenLoop } from './useOpenLoopModule'
-import { userParams } from './useUserParams'
+import { injectOpenLoop, updateParamValues, clearOpenLoop, getStatusValues } from './useOpenLoopModule'
+import { userParams, syncUserParams } from './useUserParams'
+import { analyze } from './useCodeAnalyzer'
 import { createMeasuredSolver } from '@/simulation/solver-stats'
 import { rk4Solver } from '@/simulation/solvers/rk4'
+import { eulerSolver } from '@/simulation/solvers/euler'
+import type { ODESolver } from '@/simulation/types'
 
 /**
  * 仿真运行器 — 模块级单例，驱动仿真循环。
@@ -25,12 +28,38 @@ const isRunning = isSimulationRunning
 const isPaused = isSimulationPaused
 const error = ref<string | null>(null)
 
-const measured = createMeasuredSolver(rk4Solver, 'RK4')
+// ── 可配置的仿真参数 ──────────────────────────────────────────
+export type SolverId = 'rk4' | 'euler'
+
+const SOLVERS: Record<SolverId, { solver: ODESolver; label: string }> = {
+  rk4: { solver: rk4Solver, label: 'RK4' },
+  euler: { solver: eulerSolver, label: 'Euler' },
+}
+
+const simDt = ref(0.005)
+const solverId = ref<SolverId>('rk4')
+
+let measured = createMeasuredSolver(rk4Solver, 'RK4')
+const solverVersion = ref(0)
 let rafId = 0
 let state: Float64Array | null = null
 let t = 0
 let startPlantId = ''
-const dt = 0.005 // 仿真步长
+
+function applySolver(id: SolverId) {
+  const entry = SOLVERS[id]!
+  measured = createMeasuredSolver(entry.solver, entry.label)
+  solverVersion.value++
+}
+
+function setSolver(id: SolverId) {
+  solverId.value = id
+  applySolver(id)
+}
+
+function setSimDt(value: number) {
+  simDt.value = Math.max(0.0001, value)
+}
 
 // controller 调用耗时滑动窗口
 const CTRL_WINDOW = 50
@@ -56,6 +85,13 @@ async function start() {
     error.value = `模块注入失败: ${e instanceof Error ? e.message : String(e)}`
     return
   }
+
+  // 分析代码，提取用户参数和状态名称（即使未打开编辑器也能生效）
+  const analysis = await analyze(currentCode.value)
+  syncUserParams(analysis.olCalls)
+  controllerStatusNames.value = analysis.olCalls
+    .filter((c) => c.name === 'openloop.status')
+    .map((c) => (typeof c.args[0] === 'string' ? c.args[0] : `status_${c.line}`))
 
   // 加载 controller
   const ok = await bridge.load(currentCode.value)
@@ -116,7 +152,8 @@ function tick() {
 
     // 2. 求解器推进一步
     const input = new Float64Array([u])
-    state = measured.step(plant, t, state, input, dt)
+    const currentDt = simDt.value
+    state = measured.step(plant, t, state, input, currentDt)
 
     // 检测数值发散
     for (let i = 0; i < state.length; i++) {
@@ -128,12 +165,13 @@ function tick() {
     }
 
     // 3. 计算中间变量（使用更新后的时间 t + dt）
-    const intermediates = plant.intermediates(t + dt, state, input)
+    const intermediates = plant.intermediates(t + currentDt, state, input)
 
-    // 4. 更新 UI 状态
-    updateFrame(state, input, intermediates, { ...measured.stats }, { ...ctrlStats })
+    // 4. 读取用户暴露状态并更新 UI 状态
+    const statusValues = getStatusValues()
+    updateFrame(state, input, intermediates, { ...measured.stats }, { ...ctrlStats }, statusValues)
 
-    t += dt
+    t += currentDt
   } catch (e) {
     error.value = `仿真错误: ${e instanceof Error ? e.message : String(e)}`
     stop()
@@ -169,14 +207,23 @@ function resume() {
 }
 
 export function useSimulationRunner() {
+  const stats = computed(() => {
+    solverVersion.value // track solver changes
+    return measured.stats
+  })
+
   return {
     isRunning,
     isPaused,
     error,
-    stats: measured.stats,
+    stats,
     start,
     stop,
     pause,
     resume,
+    simDt,
+    solverId,
+    setSimDt,
+    setSolver,
   }
 }
