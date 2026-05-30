@@ -12,10 +12,15 @@ def tanh(x):
 
 def controller({{args}}):
     # TODO: 在这里实现你的控制算法
-    ref = 0.0
-    inp = np.array([x, v])
-    inp[0] -= ref
+    target = ol.parameter("target", ref, min=-1.0, max=1.0, step=0.01)
+    gain = ol.parameter("gain", 1.0, min=0.1, max=20.0, step=0.1)
+
+    inp = np.array([q - target, q_dot])
     h = tanh(W1 @ inp + b1)
-    {{out}} = W2 @ h + b2
+    virtual_u = gain * (W2 @ h + b2)
+    {{out}} = input_gain_sign * virtual_u
+    ol.status("error", target - q)
+    ol.status("virtual_u", float(virtual_u))
+    ol.status("control", {{out}})
 
     return float({{out}})

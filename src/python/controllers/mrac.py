@@ -1,11 +1,16 @@
 def controller({{args}}):
-    am = 5.0     # 期望闭环极点
-    theta = 1.0  # 自适应增益
-    gamma = 1.0  # 自适应速率
+    am = ol.parameter("am", 5.0, min=0.5, max=20.0, step=0.5)
+    theta = ol.parameter("theta", 1.0, min=0.1, max=10.0, step=0.1)
+    gamma = ol.parameter("gamma", 1.0, min=0.1, max=10.0, step=0.1)
+    target = ol.parameter("target", ref, min=-1.0, max=1.0, step=0.01)
 
-    # TODO: 在这里实现你的控制算法
-    ref = 0.0
-    e = x - ref
-    {{out}} = -theta * ref - gamma * e * x
+    # TODO: 添加自适应律的持久状态；这里保留最小可运行模板
+    e = target - q
+    virtual_u = -theta * ref + gamma * e * q
+    {{out}} = input_gain_sign * virtual_u
+    ol.status("error", e)
+    ol.status("reference_pole", am)
+    ol.status("virtual_u", virtual_u)
+    ol.status("control", {{out}})
 
     return {{out}}
