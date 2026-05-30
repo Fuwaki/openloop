@@ -1,0 +1,13 @@
+<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 地面 -->
+  <line x1="1" y1="17" x2="19" y2="17"/>
+  <!-- 车轮 -->
+  <circle cx="6" cy="16" r="1.2" fill="currentColor" fill-opacity="0.2"/>
+  <circle cx="14" cy="16" r="1.2" fill="currentColor" fill-opacity="0.2"/>
+  <!-- 车身 -->
+  <rect x="4" y="12" width="12" height="3.5" rx="0.8" fill="currentColor" fill-opacity="0.12"/>
+  <!-- 摆杆 -->
+  <line x1="10" y1="12" x2="10" y2="4" stroke-width="1.4"/>
+  <!-- 摆球 -->
+  <circle cx="10" cy="3.2" r="1.5" fill="currentColor" fill-opacity="0.25"/>
+</svg>
