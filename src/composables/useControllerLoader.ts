@@ -1,25 +1,44 @@
 import { ref } from 'vue'
-import { getControllerEntry, getControllersByCategory, type ControllerEntry } from '@/models/controller-table'
+import {
+  getControllerVariant,
+  getControllersByCategory,
+  matchControllerVariant,
+  type ControllerSelection,
+} from '@/models/controller-table'
 import { useModelLoader } from './useModelLoader'
 import { generateControllerCode } from './useCodeGenerator'
-import { currentCode } from './useSimulationState'
+import { currentCode, controllerStatusNames, isSimulationRunning } from './useSimulationState'
+import { useSimulationRunner } from './useSimulationRunner'
+import { analyze } from './useCodeAnalyzer'
+import { syncUserParams } from './useUserParams'
 
-const currentController = ref<ControllerEntry | null>(null)
+const currentController = ref<ControllerSelection | null>(null)
 
-function loadController(id: string): boolean {
-  const entry = getControllerEntry(id)
-  if (!entry) return false
+async function loadController(familyId: string, variantId: string): Promise<boolean> {
+  const selection = getControllerVariant(familyId, variantId)
+  if (!selection) return false
 
   const { currentEntry } = useModelLoader()
   if (currentEntry.value) {
-    currentCode.value = generateControllerCode(
-      currentEntry.value,
-      entry.starterCode,
-      entry.inputRequirements,
-    )
+    const match = matchControllerVariant(currentEntry.value, selection.variant)
+    if (!match.compatible) return false
+    currentCode.value = generateControllerCode(currentEntry.value, selection.variant)
+
+    const analysis = await analyze(currentCode.value)
+    syncUserParams(analysis.olCalls)
+    controllerStatusNames.value = analysis.olCalls
+      .filter((c) => c.name === 'openloop.status')
+      .map((c) => (typeof c.args[0] === 'string' ? c.args[0] : `status_${c.line}`))
   }
 
-  currentController.value = entry
+  currentController.value = selection
+
+  if (isSimulationRunning.value) {
+    const runner = useSimulationRunner()
+    runner.stop()
+    void runner.start()
+  }
+
   return true
 }
 

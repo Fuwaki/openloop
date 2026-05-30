@@ -2,8 +2,11 @@ import { ref, shallowRef } from 'vue'
 import { getModelEntry, getModelsByCategory, type ModelEntry, type ParamDef } from '@/models/model-table'
 import { emptyCode } from '@/models/controller-table'
 import type { PlantModel } from '@/simulation/plants/types'
-import { currentCode } from './useSimulationState'
+import { currentCode, controllerStatusNames } from './useSimulationState'
 import { generateControllerCode } from './useCodeGenerator'
+import { usePyodide } from './usePyodide'
+import { analyze } from './useCodeAnalyzer'
+import { syncUserParams } from './useUserParams'
 
 /**
  * 模型加载器 — 单例。
@@ -56,7 +59,15 @@ async function loadModel(id: string, params?: Record<string, number>): Promise<b
   for (const p of currentParams.value) paramMap[p.name] = p.value
 
   currentPlant.value = entry.createPlant(paramMap)
-  currentCode.value = generateControllerCode(entry, emptyCode, [])
+  currentCode.value = generateControllerCode(entry, emptyCode)
+
+  // 提前初始化 Pyodide 并分析代码，提取用户参数和状态名称
+  await usePyodide().init()
+  const analysis = await analyze(currentCode.value)
+  syncUserParams(analysis.olCalls)
+  controllerStatusNames.value = analysis.olCalls
+    .filter((c) => c.name === 'openloop.status')
+    .map((c) => (typeof c.args[0] === 'string' ? c.args[0] : `status_${c.line}`))
 
   return true
 }

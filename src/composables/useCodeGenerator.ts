@@ -1,58 +1,85 @@
 import type { ModelEntry } from '@/models/model-table'
-import type { InputRequirement } from '@/models/tags'
+import type { ControllerVariant } from '@/models/controller-table'
+import { resolveVariantCode } from '@/models/controller-table'
 
-/**
- * 匹配模型状态变量到控制器输入需求。
- * 返回每个需求对应的模型变量名（按需求顺序），未匹配的为 null。
- */
-export function matchInputs(
-  modelStateVars: ModelEntry['ioSpec']['stateVars'],
-  inputRequirements: InputRequirement[],
-): (string | null)[] {
-  const result: (string | null)[] = []
-  const used = new Set<number>()
+const TEMPLATE_ALIASES = ['q', 'q_dot', 'q_ddot', 'q_3dot', 'q_4dot']
+const LEGACY_TEMPLATE_NAMES = ['x', 'v', 'x1', 'x2', 'x3', 'x4']
 
-  for (const req of inputRequirements) {
-    let matched: string | null = null
-    for (let i = 0; i < modelStateVars.length; i++) {
-      if (used.has(i)) continue
-      const v = modelStateVars[i]!
-      if (req.acceptableTags.some((t) => v.tags.includes(t))) {
-        used.add(i)
-        matched = v.name
-        break
-      }
-    }
-    result.push(matched)
+function stateIndex(model: ModelEntry, name: string): number {
+  return model.ioSpec.stateVars.findIndex((v) => v.name === name)
+}
+
+function buildUnpackLine(model: ModelEntry): string {
+  const names = model.ioSpec.stateVars.map((v) => v.name).join(', ')
+  const indices = model.ioSpec.stateVars.map((_, i) => `state[${i}]`).join(', ')
+  return `${names} = ${indices}`
+}
+
+function buildAliasLines(model: ModelEntry): string[] {
+  const { derivativeChain, reference, inputGainSign } = model.controlObjective
+  const lines: string[] = [
+    `ref = ${reference}`,
+    `input_gain_sign = ${inputGainSign}`,
+  ]
+
+  for (let i = 0; i < derivativeChain.length; i++) {
+    const source = derivativeChain[i]!
+    const alias = TEMPLATE_ALIASES[i] ?? `q_${i}`
+    lines.push(`${alias} = ${source}`)
   }
 
-  return result
+  lines.push(`e = ref - q`)
+  if (derivativeChain.length > 1) lines.push(`e_dot = -q_dot`)
+  if (derivativeChain.length > 2) lines.push(`e_ddot = -q_ddot`)
+  return lines
+}
+
+function normalizeTemplate(body: string, outputName: string): string {
+  let next = body
+
+  // 旧模板约定 x/v 表示被控量及其变化率；新生成器统一改成 q/q_dot。
+  for (let i = 0; i < LEGACY_TEMPLATE_NAMES.length; i++) {
+    const replacement = TEMPLATE_ALIASES[i] ?? `q_${i}`
+    const pattern = new RegExp(`\\b${LEGACY_TEMPLATE_NAMES[i]}\\b`, 'g')
+    next = next.replace(pattern, replacement)
+  }
+
+  next = next.replace(/\{\{args\}\}/g, 'state, t')
+  next = next.replace(/\{\{out\}\}/g, outputName)
+
+  // 旧模板通常自己定义 ref/error；这些局部变量保留可运行性。
+  return next
+}
+
+function insertGeneratedContext(body: string, model: ModelEntry): string {
+  const contextLines = [
+    buildUnpackLine(model),
+    ...buildAliasLines(model),
+  ].map((line) => `    ${line}`)
+
+  return body.replace(
+    /(def controller\(state, t\):\s*\n)/,
+    `$1${contextLines.join('\n')}\n`,
+  )
 }
 
 /**
- * 模板中的通用变量名，按 inputRequirements 顺序排列。
- * 模板 body 里用这些名字写逻辑，生成时替换为实际模型变量名。
- */
-const TEMPLATE_VAR_NAMES = ['x', 'v', 'x1', 'x2', 'x3', 'x4']
-
-/**
- * 根据模型元数据 + 控制器模板生成最终代码。
- *
- * 流程：
- *   1. 通过 tag 匹配，确定每个控制器输入对应哪个模型变量
- *   2. 用匹配到的变量名构建函数签名
- *   3. 将模板中的通用变量名替换为实际模型变量名
- *   4. 拼接头部注释 + 生成的函数体
+ * 根据模型默认控制目标 + 控制器变种生成最终 Python controller 代码。
  */
 export function generateControllerCode(
   model: ModelEntry,
-  controllerCode: string,
-  inputRequirements: InputRequirement[],
+  controllerCodeOrVariant: string | ControllerVariant,
 ): string {
-  const { ioSpec, name, description, params } = model
+  const { ioSpec, name, description, params, controlObjective } = model
   const { stateVars, outputs } = ioSpec
+  const controllerCode = typeof controllerCodeOrVariant === 'string'
+    ? controllerCodeOrVariant
+    : resolveVariantCode(model, controllerCodeOrVariant)
 
-  // ── 头部注释 ──
+  if (!controllerCode) {
+    throw new Error('当前模型没有可用的控制器模板')
+  }
+
   const lines: string[] = [
     `import numpy as np`,
     `import openloop as ol`,
@@ -60,14 +87,22 @@ export function generateControllerCode(
     `# ── ${name} ──`,
     `# ${description}`,
     `#`,
+    `# 默认控制目标: ${controlObjective.name}`,
+    `# ${controlObjective.description}`,
+    `# 参考值: ${controlObjective.reference}`,
+    `# 目标导数链: ${controlObjective.derivativeChain.join(' -> ')}`,
+    `# 控制输入: ${controlObjective.input}`,
+    `# 输入方向: ${controlObjective.inputGainSign > 0 ? '正输入推动被控量正向变化' : '正输入推动被控量负向变化'}`,
+    `#`,
     `# 状态变量 (controller 输入):`,
   ]
 
   for (let i = 0; i < stateVars.length; i++) {
     const v = stateVars[i]!
     const unit = v.unit ? ` (${v.unit})` : ''
-    const tags = v.tags.length > 0 ? ` [${v.tags.join(', ')}]` : ''
-    lines.push(`#   state[${i}] = ${v.name}${unit} — ${v.description}${tags}`)
+    const objectiveIndex = controlObjective.derivativeChain.indexOf(v.name)
+    const role = objectiveIndex >= 0 ? ` [目标 ${objectiveIndex} 阶]` : ''
+    lines.push(`#   state[${i}] = ${v.name}${unit} — ${v.description}${role}`)
   }
 
   lines.push(`#`)
@@ -82,33 +117,17 @@ export function generateControllerCode(
     lines.push(`# 模型参数: ${params.map((p) => `${p.name}=${p.value}`).join(', ')}`)
   }
 
-  // ── 匹配 + 替换 ──
-  const matched = matchInputs(stateVars, inputRequirements)
-
-  // 将模板 body 中的占位变量名替换为匹配到的模型变量名
-  let body = controllerCode
-  for (let i = 0; i < matched.length; i++) {
-    const actual = matched[i]
-    if (actual && actual !== TEMPLATE_VAR_NAMES[i]) {
-      const pattern = new RegExp(`\\b${TEMPLATE_VAR_NAMES[i]}\\b`, 'g')
-      body = body.replace(pattern, actual)
+  for (const name of controlObjective.derivativeChain) {
+    if (stateIndex(model, name) === -1) {
+      throw new Error(`控制目标变量 ${name} 不存在于模型状态变量中`)
     }
   }
 
-  // 替换占位符：函数签名固定为 state, t
-  body = body.replace(/\{\{args\}\}/, 'state, t')
-  body = body.replace(/\{\{out\}\}/g, outputs[0]!.name)
+  const outputName = controlObjective.input || outputs[0]?.name
+  if (!outputName) throw new Error('模型缺少控制输出')
 
-  // 生成解包语句：x, v, ... = state[0], state[1], ...
-  const unpackNames = stateVars.map((v) => v.name).join(', ')
-  const unpackIndices = stateVars.map((_, i) => `state[${i}]`).join(', ')
-  const unpackLine = `${unpackNames} = ${unpackIndices}`
-
-  // 在 def controller(...) 之后插入解包
-  body = body.replace(
-    /(def controller\(state, t\):\s*\n)/,
-    `$1    ${unpackLine}\n`,
-  )
+  let body = normalizeTemplate(controllerCode, outputName)
+  body = insertGeneratedContext(body, model)
 
   lines.push(``)
   lines.push(body.trimEnd())
