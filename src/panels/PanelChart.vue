@@ -53,9 +53,7 @@ const xMode = ref<XMode>('time')
 const selectedXKey = ref('')
 const selectedYKeys = ref<string[]>([])
 const yDropdownOpen = ref(false)
-const autoFit = ref(true)
 const manualYRange = ref<Range | null>(null)
-const isApplyingScale = ref(false)
 const viewStart = ref(0)
 const viewDuration = ref(0) // 0 = full view
 
@@ -208,35 +206,7 @@ function makeOpts(): uPlot.Options {
     select: { show: true, left: 0, top: 0, width: 0, height: 0, over: true },
     series: makeSeries(),
     cursor: { drag: { x: true, y: true } },
-    hooks: {
-      setScale: [
-        (self, scaleKey) => {
-          if (isApplyingScale.value) return
-          if (scaleKey === 'x') {
-            const min = self.scales.x?.min
-            const max = self.scales.x?.max
-            if (typeof min === 'number' && typeof max === 'number') {
-              const data = dataExtent.value
-              if (data) {
-                const dur = max - min
-                const start = Math.max(data[0], min)
-                viewStart.value = start
-                viewDuration.value = Math.min(dur, data[1] - start)
-                renderScrubber()
-              }
-            }
-          }
-          if (scaleKey === 'y') {
-            const min = self.scales.y?.min
-            const max = self.scales.y?.max
-            if (typeof min === 'number' && typeof max === 'number') {
-              manualYRange.value = [min, max]
-              autoFit.value = false
-            }
-          }
-        },
-      ],
-    },
+    hooks: {},
   }
 }
 
@@ -278,10 +248,13 @@ function updateChart() {
       syncPlotSize()
     }
     if (plot) {
-      isApplyingScale.value = true
-      plot.setData(currentData(), autoFit.value)
-      isApplyingScale.value = false
-      applyViewRange()
+      const fullView = viewDuration.value <= 0
+      plot.setData(currentData(), fullView || !manualYRange.value)
+      if (!fullView) {
+        applyViewRange()
+      } else if (manualYRange.value) {
+        plot.setScale('y', { min: manualYRange.value[0], max: manualYRange.value[1] })
+      }
     }
   } else {
     renderSignalPlot()
@@ -377,7 +350,6 @@ function resetView() {
   viewStart.value = 0
   viewDuration.value = 0
   manualYRange.value = null
-  autoFit.value = true
   isFollowingLatest.value = true
   updateChart()
   renderScrubber()
@@ -385,7 +357,32 @@ function resetView() {
 
 function resetYFit() {
   manualYRange.value = null
-  autoFit.value = true
+  updateChart()
+}
+
+function onChartWheel(event: WheelEvent) {
+  if (xMode.value !== 'time' || !plot) return
+  event.preventDefault()
+
+  // Get current Y range from plot
+  const yMin = plot.scales.y?.min
+  const yMax = plot.scales.y?.max
+  if (typeof yMin !== 'number' || typeof yMax !== 'number') return
+
+  // Cursor Y position in plot coordinates
+  const plotRect = plotHostRef.value?.getBoundingClientRect()
+  if (!plotRect) return
+  const mouseY = event.clientY - plotRect.top
+  const plotH = plotRect.height
+  const ratio = 1 - (mouseY / plotH) // 0=top, 1=bottom
+  const cursorY = yMin + ratio * (yMax - yMin)
+
+  // Zoom centered on cursor
+  const factor = event.deltaY > 0 ? 1 / 0.8 : 0.8
+  const newMin = cursorY - (cursorY - yMin) * factor
+  const newMax = cursorY + (yMax - cursorY) * factor
+
+  manualYRange.value = [newMin, newMax]
   updateChart()
 }
 
@@ -573,7 +570,18 @@ function renderScrubber() {
   ctx.textAlign = 'right'
   ctx.fillText(formatTime(data[1]), w - 4, h - 4)
   ctx.textAlign = 'center'
-  ctx.fillText(range ? `${formatTime(range[0])} – ${formatTime(range[1])}` : '全量', w / 2, 11)
+  if (range) {
+    ctx.fillText(`${formatTime(range[0])} – ${formatTime(range[1])}`, w / 2, 11)
+  } else {
+    ctx.fillText('全量', w / 2, 11)
+    if (data[1] - data[0] > 10) {
+      ctx.font = '9px system-ui, -apple-system, sans-serif'
+      ctx.fillStyle = `rgb(${rawVar('--c-text-muted', '136 136 136')})`
+      ctx.globalAlpha = 0.6
+      ctx.fillText('双击查看最新 10s', w / 2, 22)
+      ctx.globalAlpha = 1
+    }
+  }
 }
 
 function getScrubberDragMode(clientX: number): DragMode {
@@ -649,7 +657,6 @@ function onScrubberPointerMove(event: PointerEvent) {
     viewDuration.value = Math.min(dur, data[1] - viewStart.value)
   }
 
-  applyViewRange()
   renderScrubber()
   updateChart()
 }
@@ -688,7 +695,6 @@ function onScrubberWheel(event: WheelEvent) {
   viewDuration.value = newDur
 
   checkAutoFollow()
-  applyViewRange()
   renderScrubber()
   updateChart()
 }
@@ -709,8 +715,6 @@ function onScrubberDblClick() {
     isFollowingLatest.value = true
   }
   manualYRange.value = null
-  autoFit.value = true
-  applyViewRange()
   updateChart()
   renderScrubber()
 }
@@ -738,13 +742,10 @@ function applyViewRange() {
   if (!plot || xMode.value !== 'time') return
   const xRange = currentXRange()
   const yRange = currentYRange(xRange)
-
-  isApplyingScale.value = true
   plot.batch(() => {
     if (xRange) plot?.setScale('x', { min: xRange[0], max: xRange[1] })
     if (yRange) plot?.setScale('y', { min: yRange[0], max: yRange[1] })
   })
-  isApplyingScale.value = false
 }
 
 function renderSignalPlot() {
@@ -1005,13 +1006,16 @@ onBeforeUnmount(() => {
 
     </div>
 
-    <div ref="chartAreaRef" class="flex-1 min-h-0 relative">
+    <div ref="chartAreaRef" class="flex-1 min-h-0 relative" @wheel.prevent="onChartWheel">
       <canvas v-if="xMode === 'time' && !hasData" ref="placeholderCanvasRef" class="absolute inset-0 h-full w-full" />
       <div v-show="xMode === 'time'" ref="plotHostRef" class="h-full w-full" />
       <canvas v-show="xMode === 'signal'" ref="canvasRef" class="absolute inset-0 h-full w-full" />
       <button
-        v-if="manualYRange"
-        class="absolute top-1 right-1 z-10 text-[10px] px-1.5 py-0.5 rounded bg-bgBase/80 text-textMuted hover:text-textBase border border-surfaceHover hover:border-primary/50 transition-colors cursor-pointer"
+        v-if="hasData"
+        class="absolute top-1 right-1 z-10 text-[10px] px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+        :class="manualYRange
+          ? 'bg-bgBase/80 text-textMuted hover:text-textBase border border-surfaceHover hover:border-primary/50'
+          : 'bg-primary/20 text-primary border border-primary/40'"
         @click="resetYFit"
       >
         Y 自动
