@@ -8,7 +8,7 @@ import { useUserParams } from '@/composables/useUserParams'
 import type * as monaco from 'monaco-editor'
 
 const { runOnce, isRunning, isPyodideReady, isPyodideLoading } = useCodeExecutor()
-const { currentCode, isSimulationRunning } = useSimulationState()
+const { currentCode, isSimulationRunning, controllerStatusNames } = useSimulationState()
 const { analyze } = useCodeAnalyzer()
 const { syncUserParams } = useUserParams()
 
@@ -53,6 +53,7 @@ async function runAnalysis(code: string) {
     markers.value = []
     decorations.value = []
     syncUserParams([])
+    controllerStatusNames.value = []
     return
   }
 
@@ -64,6 +65,9 @@ async function runAnalysis(code: string) {
     markers.value = buildMarkers(result)
     decorations.value = buildDecorations(result)
     syncUserParams(result.olCalls)
+    controllerStatusNames.value = result.olCalls
+      .filter((c) => c.name === 'openloop.status')
+      .map((c) => (typeof c.args[0] === 'string' ? c.args[0] : `status_${c.line}`))
   } catch {
     // 分析失败时保留上次结果，不做处理
   }

@@ -6,27 +6,27 @@ import { useSimulationState } from '@/composables/useSimulationState'
 import { useModelLoader } from '@/composables/useModelLoader'
 
 const { currentPlant } = useModelLoader()
-const { currentState, currentInput, currentIntermediates, solverStats, simulationRunId } = useSimulationState()
+const {
+  currentState, currentInput, currentIntermediates,
+  controllerStatus, controllerStatusNames,
+  solverStats, simulationRunId,
+  initHistory, appendHistory, getHistoryBuffer, clearHistory, historyVersion,
+} = useSimulationState()
 
 interface SignalDef {
   key: string
   label: string
-  source: 'state' | 'input' | 'intermediate'
+  source: 'state' | 'input' | 'intermediate' | 'status'
   index: number
+  statusName?: string
 }
 
 type XMode = 'time' | 'signal'
 type Range = [number, number]
 
-const MAX_POINTS = 100_000
 const SERIES_COLORS = ['#10b981', '#60a5fa', '#f59e0b', '#ef4444', '#a78bfa', '#22d3ee']
-const X_WINDOWS = [
-  { label: '全量', value: 0 },
-  { label: '5s', value: 5 },
-  { label: '10s', value: 10 },
-  { label: '30s', value: 30 },
-  { label: '60s', value: 60 },
-]
+const SCRUBBER_EDGE_PX = 6
+const ZOOM_FACTOR = 0.8
 
 const signals = computed<SignalDef[]>(() => {
   const plant = currentPlant.value
@@ -42,6 +42,10 @@ const signals = computed<SignalDef[]>(() => {
   plant.intermediateVars.forEach((v, i) => {
     list.push({ key: `m_${v.name}`, label: formatSignalLabel(v.name, v.label, v.unit), source: 'intermediate', index: i })
   })
+  const statusNames = statusSignalKey.value ? statusSignalKey.value.split('\x1f') : []
+  statusNames.forEach((name) => {
+    list.push({ key: `c_${name}`, label: `${name} (controller)`, source: 'status', index: -1, statusName: name })
+  })
   return list
 })
 
@@ -50,23 +54,35 @@ const selectedXKey = ref('')
 const selectedYKeys = ref<string[]>([])
 const yDropdownOpen = ref(false)
 const autoFit = ref(true)
-const xWindowSec = ref(0)
-const followLatest = ref(true)
-const navEnd = ref(0)
-const manualXRange = ref<Range | null>(null)
 const manualYRange = ref<Range | null>(null)
 const isApplyingScale = ref(false)
-const dataVersion = ref(0)
+const viewStart = ref(0)
+const viewDuration = ref(0) // 0 = full view
 
 const chartAreaRef = ref<HTMLElement>()
 const plotHostRef = ref<HTMLElement>()
 const canvasRef = ref<HTMLCanvasElement>()
 const yDropdownRef = ref<HTMLElement>()
+const scrubberRef = ref<HTMLElement>()
+const scrubberCanvasRef = ref<HTMLCanvasElement>()
+const placeholderCanvasRef = ref<HTMLCanvasElement>()
 let plot: uPlot | null = null
 let resizeObserver: ResizeObserver | null = null
+let scrubberResizeObserver: ResizeObserver | null = null
+let historyInitialized = false
 
-const xBuf: number[] = []
-const yBufs = new Map<string, number[]>()
+type DragMode = 'none' | 'pan' | 'resize-left' | 'resize-right' | 'scrub'
+let dragMode: DragMode = 'none'
+let dragStartX = 0
+let dragStartViewStart = 0
+let dragStartViewDuration = 0
+
+const xBuf = computed<number[]>(() => { historyVersion.value; return getHistoryBuffer('t') })
+const statusSignalKey = computed(() => {
+  const liveNames = controllerStatus.value.map((s) => s.name)
+  const allNames = [...new Set([...controllerStatusNames.value, ...liveNames])]
+  return allNames.join('\x1f')
+})
 
 function formatSignalLabel(name: string, label: string, unit?: string): string {
   const title = label && label !== name ? `${name} (${label})` : name
@@ -85,6 +101,7 @@ function findSignal(key: string): SignalDef | undefined {
 function getSignalValue(sig: SignalDef): number {
   if (sig.source === 'state') return currentState.value?.[sig.index] ?? 0
   if (sig.source === 'input') return currentInput.value?.[sig.index] ?? 0
+  if (sig.source === 'status') return controllerStatus.value.find((s) => s.name === sig.statusName)?.value ?? 0
   return currentIntermediates.value?.[sig.index] ?? 0
 }
 
@@ -132,34 +149,39 @@ const selectedYLabel = computed(() => {
   return `${selected.length} 个信号`
 })
 
-const historyRange = computed<Range>(() => {
-  dataVersion.value
-  if (!xBuf.length) return [0, 0]
-  return [xBuf[0]!, xBuf[xBuf.length - 1]!]
+const dataExtent = computed<Range | null>(() => {
+  historyVersion.value
+  const buf = xBuf.value
+  if (buf.length < 2) return null
+  return [buf[0]!, buf[buf.length - 1]!]
 })
 
-const hasNavigator = computed(() => {
-  dataVersion.value
-  return xMode.value === 'time' && xBuf.length > 1
+const hasData = computed(() => {
+  historyVersion.value
+  return xBuf.value.length > 1
 })
 
-const navigatorMin = computed(() => {
-  const [min, max] = historyRange.value
-  if (xWindowSec.value <= 0) return min
-  return Math.min(max, min + xWindowSec.value)
-})
+const hasScrubber = computed(() => xMode.value === 'time' && !!dataExtent.value)
 
-const navigatorMax = computed(() => historyRange.value[1])
+const isFollowingLatest = ref(true)
 
-const navigatorStep = computed(() => {
-  const [min, max] = historyRange.value
-  if (max <= min) return 0.001
-  return Math.max(0.0001, (max - min) / 1000)
-})
+function checkAutoFollow() {
+  const data = dataExtent.value
+  if (!data || viewDuration.value <= 0) { isFollowingLatest.value = true; return }
+  const epsilon = (data[1] - data[0]) * 0.001
+  if (viewStart.value + viewDuration.value >= data[1] - epsilon) {
+    isFollowingLatest.value = true
+    viewStart.value = Math.max(data[0], data[1] - viewDuration.value)
+  }
+}
 
-const navigatorWindowLabel = computed(() => {
-  const range = currentXRange() ?? historyRange.value
-  return `${formatTime(range[0])} - ${formatTime(range[1])}`
+const scrubberViewRange = computed<Range | null>(() => {
+  const data = dataExtent.value
+  if (!data) return null
+  if (viewDuration.value <= 0) return null // full view → autoFit
+  const end = Math.min(viewStart.value + viewDuration.value, data[1])
+  const start = Math.max(viewStart.value, data[0])
+  return [start, end]
 })
 
 function makeSeries(): uPlot.Series[] {
@@ -194,8 +216,14 @@ function makeOpts(): uPlot.Options {
             const min = self.scales.x?.min
             const max = self.scales.x?.max
             if (typeof min === 'number' && typeof max === 'number') {
-              manualXRange.value = [min, max]
-              autoFit.value = false
+              const data = dataExtent.value
+              if (data) {
+                const dur = max - min
+                const start = Math.max(data[0], min)
+                viewStart.value = start
+                viewDuration.value = Math.min(dur, data[1] - start)
+                renderScrubber()
+              }
             }
           }
           if (scaleKey === 'y') {
@@ -214,8 +242,8 @@ function makeOpts(): uPlot.Options {
 
 function currentData(): uPlot.AlignedData {
   return [
-    new Float64Array(xBuf),
-    ...selectedYKeys.value.map((key) => new Float64Array(yBufs.get(key) ?? [])),
+    new Float64Array(xBuf.value),
+    ...selectedYKeys.value.map((key) => new Float64Array(getHistoryBuffer(key))),
   ]
 }
 
@@ -225,42 +253,52 @@ function syncPlotSize() {
     plot.setSize({ width: Math.max(1, Math.floor(width)), height: Math.max(1, Math.floor(height)) })
   }
   renderSignalPlot()
+  renderPlaceholder()
 }
 
 function rebuildPlot() {
   plot?.destroy()
   plot = null
-  if (xMode.value === 'time' && plotHostRef.value) {
+  if (xMode.value === 'time' && plotHostRef.value && hasData.value) {
     plot = new uPlot(makeOpts(), currentData(), plotHostRef.value)
     syncPlotSize()
     applyViewRange()
     return
   }
-  nextTick(renderSignalPlot)
+  if (xMode.value === 'signal') {
+    nextTick(renderSignalPlot)
+  }
+  nextTick(renderPlaceholder)
 }
 
 function updateChart() {
   if (xMode.value === 'time') {
-    isApplyingScale.value = true
-    plot?.setData(currentData(), autoFit.value)
-    isApplyingScale.value = false
-    applyViewRange()
+    if (!plot && hasData.value && plotHostRef.value) {
+      plot = new uPlot(makeOpts(), currentData(), plotHostRef.value)
+      syncPlotSize()
+    }
+    if (plot) {
+      isApplyingScale.value = true
+      plot.setData(currentData(), autoFit.value)
+      isApplyingScale.value = false
+      applyViewRange()
+    }
   } else {
     renderSignalPlot()
   }
 }
 
 function clearData() {
-  xBuf.length = 0
-  yBufs.clear()
-  manualXRange.value = null
+  clearHistory()
+  viewStart.value = 0
+  viewDuration.value = 0
   manualYRange.value = null
-  selectedYKeys.value.forEach((key) => yBufs.set(key, []))
-  dataVersion.value++
   updateChart()
+  renderScrubber()
 }
 
 function resetRunData() {
+  historyInitialized = false
   clearData()
   plot?.setSelect({ left: 0, top: 0, width: 0, height: 0 }, false)
 }
@@ -299,10 +337,11 @@ function finiteRange(values: number[]): [number, number] {
 }
 
 function visibleIndices(xRange: Range | null): number[] {
-  if (!xRange) return xBuf.map((_, i) => i)
+  const buf = xBuf.value
+  if (!xRange) return buf.map((_, i) => i)
   const [min, max] = xRange
   const indices: number[] = []
-  xBuf.forEach((value, index) => {
+  buf.forEach((value, index) => {
     if (value >= min && value <= max) indices.push(index)
   })
   return indices
@@ -313,102 +352,386 @@ function rangeForIndices(values: number[], indices: number[]): Range {
 }
 
 function fullXRange(): Range {
-  return finiteRange(xBuf)
+  return finiteRange(xBuf.value)
 }
 
 function fullYRange(indices = visibleIndices(currentXRange())): Range {
   const values = selectedYKeys.value.flatMap((key) => {
-    const buf = yBufs.get(key) ?? []
+    const buf = getHistoryBuffer(key)
     return indices.map((index) => buf[index]).filter((value): value is number => value !== undefined)
   })
   return finiteRange(values)
 }
 
 function currentXRange(): Range | null {
-  if (manualXRange.value) return manualXRange.value
-  if (xMode.value === 'time' && xWindowSec.value > 0 && xBuf.length) {
-    const max = followLatest.value ? xBuf[xBuf.length - 1]! : navEnd.value
-    return [max - xWindowSec.value, max]
-  }
-  if (!autoFit.value && xBuf.length) return fullXRange()
-  return null
+  return scrubberViewRange.value
 }
 
 function currentYRange(xRange = currentXRange()): Range | null {
   if (manualYRange.value) return manualYRange.value
-  if (xRange && autoFit.value) return fullYRange(visibleIndices(xRange))
-  if (!autoFit.value && xBuf.length) return fullYRange(visibleIndices(xRange))
+  if (xRange) return fullYRange(visibleIndices(xRange))
   return null
 }
 
-function setAutoFit(value: boolean) {
-  autoFit.value = value
-  if (value) {
-    manualXRange.value = null
-    manualYRange.value = null
-  }
-  updateChart()
-}
-
-function fitView() {
-  const xRange = currentXRange()
-  manualXRange.value = xRange
-  manualYRange.value = fullYRange(visibleIndices(xRange))
-  autoFit.value = false
-  followLatest.value = false
-  applyViewRange()
-  renderSignalPlot()
-}
-
-function resetZoom() {
-  manualXRange.value = null
+function resetView() {
+  viewStart.value = 0
+  viewDuration.value = 0
   manualYRange.value = null
   autoFit.value = true
-  followLatest.value = true
-  syncNavigatorToLatest()
+  isFollowingLatest.value = true
+  updateChart()
+  renderScrubber()
+}
+
+function resetYFit() {
+  manualYRange.value = null
+  autoFit.value = true
   updateChart()
 }
 
-function onXWindowChange(event: Event) {
-  xWindowSec.value = Number((event.target as HTMLSelectElement).value)
-  manualXRange.value = null
-  followLatest.value = true
-  syncNavigatorToLatest()
-  applyViewRange()
-  renderSignalPlot()
-}
+// ─── Placeholder ──────────────────────────────────────────────
 
-function syncNavigatorToLatest() {
-  navEnd.value = xBuf.length ? xBuf[xBuf.length - 1]! : 0
-}
+function renderPlaceholder() {
+  const canvas = placeholderCanvasRef.value
+  const host = chartAreaRef.value
+  if (!canvas || !host) return
 
-function onNavigatorInput(event: Event) {
-  followLatest.value = false
-  manualXRange.value = null
-  navEnd.value = Number((event.target as HTMLInputElement).value)
-  applyViewRange()
-  renderSignalPlot()
-}
+  const rect = host.getBoundingClientRect()
+  const dpr = window.devicePixelRatio || 1
+  const w = Math.max(1, Math.floor(rect.width))
+  const h = Math.max(1, Math.floor(rect.height))
+  canvas.width = Math.floor(w * dpr)
+  canvas.height = Math.floor(h * dpr)
+  canvas.style.width = `${w}px`
+  canvas.style.height = `${h}px`
 
-function jumpToLatest() {
-  followLatest.value = true
-  manualXRange.value = null
-  syncNavigatorToLatest()
-  applyViewRange()
-  renderSignalPlot()
-}
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-function pruneBufferedData() {
-  let removeCount = 0
+  const styles = getComputedStyle(document.documentElement)
+  const rawVar = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback
+  const bg = `rgb(${rawVar('--c-bg-base', '18 18 18')})`
+  const grid = `rgb(${rawVar('--c-bg-surface-hover', '42 42 42')})`
+  const text = `rgb(${rawVar('--c-text-muted', '136 136 136')})`
+  const textDim = `rgb(${rawVar('--c-text-muted', '136 136 136')})`
 
-  if (xBuf.length > MAX_POINTS) {
-    removeCount = xBuf.length - MAX_POINTS
+  ctx.clearRect(0, 0, w, h)
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, w, h)
+
+  const pad = { top: 28, right: 20, bottom: 38, left: 56 }
+  const plotW = Math.max(1, w - pad.left - pad.right)
+  const plotH = Math.max(1, h - pad.top - pad.bottom)
+
+  // Grid
+  ctx.strokeStyle = grid
+  ctx.lineWidth = 1
+  for (let i = 0; i <= 5; i++) {
+    const x = pad.left + (plotW * i) / 5
+    const y = pad.top + (plotH * i) / 5
+    ctx.beginPath()
+    ctx.moveTo(x, pad.top)
+    ctx.lineTo(x, pad.top + plotH)
+    ctx.moveTo(pad.left, y)
+    ctx.lineTo(pad.left + plotW, y)
+    ctx.stroke()
   }
 
-  if (removeCount <= 0) return
-  xBuf.splice(0, removeCount)
-  selectedYKeys.value.forEach((key) => yBufs.get(key)?.splice(0, removeCount))
-  dataVersion.value++
+  // Axes
+  ctx.strokeStyle = text
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(pad.left, pad.top)
+  ctx.lineTo(pad.left, pad.top + plotH)
+  ctx.lineTo(pad.left + plotW, pad.top + plotH)
+  ctx.stroke()
+
+  // Tick marks
+  ctx.lineWidth = 1
+  for (let i = 0; i <= 5; i++) {
+    const x = pad.left + (plotW * i) / 5
+    const y = pad.top + plotH
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x, y + 4)
+    ctx.stroke()
+  }
+  for (let i = 0; i <= 5; i++) {
+    const x = pad.left
+    const y = pad.top + plotH - (plotH * i) / 5
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x - 4, y)
+    ctx.stroke()
+  }
+
+  // Axis labels
+  ctx.font = '11px system-ui, -apple-system, sans-serif'
+  ctx.fillStyle = text
+  ctx.textAlign = 'center'
+  ctx.fillText(xAxisLabel.value, pad.left + plotW / 2, h - 8)
+  ctx.save()
+  ctx.translate(14, pad.top + plotH / 2)
+  ctx.rotate(-Math.PI / 2)
+  ctx.fillText('信号值', 0, 0)
+  ctx.restore()
+
+  // Axis numbers
+  ctx.font = '10px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  for (let i = 0; i <= 5; i++) {
+    const x = pad.left + (plotW * i) / 5
+    ctx.fillText((i * 2).toFixed(1), x, pad.top + plotH + 16)
+  }
+  ctx.textAlign = 'right'
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + plotH - (plotH * i) / 5
+    ctx.fillText((i * 0.2).toFixed(1), pad.left - 6, y + 4)
+  }
+
+  // Center hint
+  ctx.font = '13px system-ui, -apple-system, sans-serif'
+  ctx.fillStyle = textDim
+  ctx.textAlign = 'center'
+  ctx.fillText('运行仿真以查看数据', w / 2, h / 2)
+}
+
+// ─── Scrubber ────────────────────────────────────────────────
+
+function scrubberToTime(px: number, width: number): number {
+  const data = dataExtent.value
+  if (!data || width <= 0) return 0
+  return data[0] + (px / width) * (data[1] - data[0])
+}
+
+function timeToScrubber(t: number, width: number): number {
+  const data = dataExtent.value
+  if (!data || data[1] <= data[0]) return 0
+  return ((t - data[0]) / (data[1] - data[0])) * width
+}
+
+function renderScrubber() {
+  const canvas = scrubberCanvasRef.value
+  const host = scrubberRef.value
+  if (!canvas || !host) return
+
+  const rect = host.getBoundingClientRect()
+  const dpr = window.devicePixelRatio || 1
+  const w = Math.max(1, Math.floor(rect.width))
+  const h = Math.max(1, Math.floor(rect.height))
+  canvas.width = Math.floor(w * dpr)
+  canvas.height = Math.floor(h * dpr)
+  canvas.style.width = `${w}px`
+  canvas.style.height = `${h}px`
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+  const styles = getComputedStyle(document.documentElement)
+  const rawVar = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback
+  const primaryRgb = rawVar('--c-primary', '16 185 129')
+  const primaryParts = primaryRgb.split(/[\s/]+/).slice(0, 3).join(', ')
+  const trackBg = `rgb(${rawVar('--c-bg-surface', '30 30 30')})`
+  const text = `rgb(${rawVar('--c-text-muted', '136 136 136')})`
+
+  ctx.clearRect(0, 0, w, h)
+
+  // Track background
+  ctx.fillStyle = trackBg
+  ctx.fillRect(0, 0, w, h)
+
+  const data = dataExtent.value
+  if (!data || data[1] <= data[0]) return
+
+  const range = scrubberViewRange.value
+  const selLeft = range ? timeToScrubber(range[0], w) : 0
+  const selRight = range ? timeToScrubber(range[1], w) : w
+  const selW = Math.max(4, selRight - selLeft)
+
+  // Selection rectangle
+  ctx.fillStyle = `rgba(${primaryParts}, 0.15)`
+  ctx.fillRect(selLeft, 0, selW, h)
+  ctx.strokeStyle = `rgba(${primaryParts}, 0.7)`
+  ctx.lineWidth = 2
+  ctx.strokeRect(selLeft + 1, 1, selW - 2, h - 2)
+
+  // Edge handles (only in local mode)
+  if (range) {
+    const handleW = SCRUBBER_EDGE_PX
+    ctx.fillStyle = `rgba(${primaryParts}, 0.5)`
+    ctx.fillRect(selLeft, 0, handleW, h)
+    ctx.fillRect(selRight - handleW, 0, handleW, h)
+  }
+
+  // Time labels
+  ctx.font = '10px system-ui, -apple-system, sans-serif'
+  ctx.fillStyle = text
+  ctx.textAlign = 'left'
+  ctx.fillText(formatTime(data[0]), 4, h - 4)
+  ctx.textAlign = 'right'
+  ctx.fillText(formatTime(data[1]), w - 4, h - 4)
+  ctx.textAlign = 'center'
+  ctx.fillText(range ? `${formatTime(range[0])} – ${formatTime(range[1])}` : '全量', w / 2, 11)
+}
+
+function getScrubberDragMode(clientX: number): DragMode {
+  const canvas = scrubberCanvasRef.value
+  if (!canvas) return 'scrub'
+  const rect = canvas.getBoundingClientRect()
+  const x = clientX - rect.left
+  const w = rect.width
+  const range = scrubberViewRange.value
+  const data = dataExtent.value
+  if (!data || w <= 0) return 'scrub'
+  const selLeft = range ? timeToScrubber(range[0], w) : 0
+  const selRight = range ? timeToScrubber(range[1], w) : w
+  if (x >= selLeft - SCRUBBER_EDGE_PX && x <= selLeft + SCRUBBER_EDGE_PX) return 'resize-left'
+  if (x >= selRight - SCRUBBER_EDGE_PX && x <= selRight + SCRUBBER_EDGE_PX) return 'resize-right'
+  if (x > selLeft && x < selRight) return 'pan'
+  return 'scrub'
+}
+
+function onScrubberPointerDown(event: PointerEvent) {
+  if (event.button !== 0) return
+  // Full view: no drag interaction, double-click to enter local mode
+  if (viewDuration.value <= 0) return
+
+  const canvas = scrubberCanvasRef.value
+  if (!canvas) return
+  const rect = canvas.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const data = dataExtent.value
+  if (!data) return
+
+  dragMode = getScrubberDragMode(event.clientX)
+  if (dragMode === 'scrub') return // click outside selection in local mode: no-op
+  dragStartX = x
+  dragStartViewStart = viewStart.value
+  dragStartViewDuration = viewDuration.value
+  isFollowingLatest.value = false
+
+  canvas.setPointerCapture(event.pointerId)
+  canvas.addEventListener('pointermove', onScrubberPointerMove)
+  canvas.addEventListener('pointerup', onScrubberPointerUp)
+  canvas.addEventListener('pointercancel', onScrubberPointerUp)
+  event.preventDefault()
+}
+
+function onScrubberPointerMove(event: PointerEvent) {
+  const canvas = scrubberCanvasRef.value
+  if (!canvas) return
+  const rect = canvas.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const w = rect.width
+  const data = dataExtent.value
+  if (!data || w <= 0) return
+
+  const dx = x - dragStartX
+  const dtPerPixel = (data[1] - data[0]) / w
+
+  if (dragMode === 'pan') {
+    const delta = dx * dtPerPixel
+    const newStart = dragStartViewStart + delta
+    const clampedStart = Math.max(data[0], Math.min(newStart, data[1] - dragStartViewDuration))
+    viewStart.value = clampedStart
+    viewDuration.value = dragStartViewDuration
+  } else if (dragMode === 'resize-left') {
+    const newStart = scrubberToTime(x, w)
+    const end = dragStartViewStart + dragStartViewDuration
+    const clampedStart = Math.max(data[0], Math.min(newStart, end - 0.01))
+    viewStart.value = clampedStart
+    viewDuration.value = end - clampedStart
+  } else if (dragMode === 'resize-right') {
+    const newEnd = scrubberToTime(x, w)
+    const dur = Math.max(0.01, newEnd - dragStartViewStart)
+    viewDuration.value = Math.min(dur, data[1] - viewStart.value)
+  }
+
+  applyViewRange()
+  renderScrubber()
+  updateChart()
+}
+
+function onScrubberPointerUp(event: PointerEvent) {
+  const canvas = scrubberCanvasRef.value
+  if (!canvas) return
+  canvas.removeEventListener('pointermove', onScrubberPointerMove)
+  canvas.removeEventListener('pointerup', onScrubberPointerUp)
+  canvas.removeEventListener('pointercancel', onScrubberPointerUp)
+  checkAutoFollow()
+  renderScrubber()
+  dragMode = 'none'
+}
+
+function onScrubberWheel(event: WheelEvent) {
+  // Full view: no zoom, double-click to enter local mode
+  if (viewDuration.value <= 0) return
+  event.preventDefault()
+  isFollowingLatest.value = false
+
+  const canvas = scrubberCanvasRef.value
+  if (!canvas) return
+  const rect = canvas.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const w = rect.width
+  const data = dataExtent.value
+  if (!data || w <= 0) return
+
+  const cursorTime = scrubberToTime(x, w)
+  const ratio = (cursorTime - viewStart.value) / viewDuration.value
+  const factor = event.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
+  const newDur = Math.max(0.01, Math.min(viewDuration.value * factor, data[1] - data[0]))
+  const newStart = cursorTime - ratio * newDur
+  viewStart.value = Math.max(data[0], Math.min(newStart, data[1] - newDur))
+  viewDuration.value = newDur
+
+  checkAutoFollow()
+  applyViewRange()
+  renderScrubber()
+  updateChart()
+}
+
+function onScrubberDblClick() {
+  const data = dataExtent.value
+  if (!data) return
+  if (viewDuration.value <= 0) {
+    // Full → 10s window at the right edge
+    const dur = Math.min(10, data[1] - data[0])
+    viewDuration.value = dur
+    viewStart.value = Math.max(data[0], data[1] - dur)
+    isFollowingLatest.value = true
+  } else {
+    // Local → full view
+    viewDuration.value = 0
+    viewStart.value = 0
+    isFollowingLatest.value = true
+  }
+  manualYRange.value = null
+  autoFit.value = true
+  applyViewRange()
+  updateChart()
+  renderScrubber()
+}
+
+function onScrubberPointerMoveCursor(event: PointerEvent) {
+  if (dragMode !== 'none') return
+  const canvas = scrubberCanvasRef.value
+  if (!canvas) return
+  // Full view: default cursor, no interaction
+  if (viewDuration.value <= 0) {
+    canvas.style.cursor = 'default'
+    return
+  }
+  const mode = getScrubberDragMode(event.clientX)
+  if (mode === 'resize-left' || mode === 'resize-right') {
+    canvas.style.cursor = 'ew-resize'
+  } else if (mode === 'pan') {
+    canvas.style.cursor = 'grab'
+  } else {
+    canvas.style.cursor = 'default'
+  }
 }
 
 function applyViewRange() {
@@ -462,7 +785,7 @@ function renderSignalPlot() {
   const plotH = Math.max(1, height - pad.top - pad.bottom)
   const xRange = currentXRange()
   const visible = visibleIndices(xRange)
-  const [xMin, xMax] = xRange ?? rangeForIndices(xBuf, visible)
+  const [xMin, xMax] = xRange ?? rangeForIndices(xBuf.value, visible)
   const [yMin, yMax] = currentYRange(xRange) ?? fullYRange(visible)
   const toX = (v: number) => pad.left + ((v - xMin) / (xMax - xMin)) * plotW
   const toY = (v: number) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH
@@ -501,14 +824,15 @@ function renderSignalPlot() {
   ctx.fillText(xMax.toPrecision(3), pad.left + plotW, pad.top + plotH + 16)
 
   selectedYKeys.value.forEach((key, seriesIdx) => {
-    const ys = yBufs.get(key) ?? []
+    const ys = getHistoryBuffer(key)
     ctx.strokeStyle = SERIES_COLORS[seriesIdx % SERIES_COLORS.length]!
     ctx.lineWidth = 2
     ctx.beginPath()
     let hasPoint = false
-    const len = Math.min(xBuf.length, ys.length)
+    const buf = xBuf.value
+    const len = Math.min(buf.length, ys.length)
     for (let i = 0; i < len; i++) {
-      const xValue = xBuf[i]
+      const xValue = buf[i]
       const yValue = ys[i]
       if (xValue === undefined || yValue === undefined) continue
       const x = toX(xValue)
@@ -542,7 +866,6 @@ function toggleY(key: string) {
 
   if (!next.length) return
   selectedYKeys.value = next
-  clearData()
   rebuildPlot()
 }
 
@@ -567,47 +890,50 @@ watch(simulationRunId, () => {
   resetRunData()
 })
 
+watch(hasData, (val) => {
+  if (!val) nextTick(renderPlaceholder)
+})
+
 watch(
   () => solverStats.value?.stepCount,
   () => {
     const stats = solverStats.value
-    if (!stats) return
-    if (stats.stepCount === 0 || selectedYKeys.value.length === 0) return
+    if (!stats || stats.stepCount === 0) return
 
-    const x = getXValue(stats.simTime)
-    if (x === null || !Number.isFinite(x)) return
+    const allSigs = signals.value
+    if (!allSigs.length) return
 
-    const values: Array<[string, number]> = []
-    for (const key of selectedYKeys.value) {
-      const sig = findSignal(key)
-      if (!sig) return
-      const value = getSignalValue(sig)
-      if (!Number.isFinite(value)) return
-      values.push([key, value])
+    if (!historyInitialized) {
+      const keys = allSigs.map((s) => s.key)
+      initHistory('t', keys)
+      historyInitialized = true
     }
 
-    xBuf.push(x)
-    for (const [key, value] of values) {
-      let buf = yBufs.get(key)
-      if (!buf) {
-        buf = []
-        yBufs.set(key, buf)
+    const values = new Float64Array(1 + allSigs.length)
+    values[0] = stats.simTime
+    for (let i = 0; i < allSigs.length; i++) {
+      values[1 + i] = getSignalValue(allSigs[i]!)
+    }
+    appendHistory(values)
+
+    if (isFollowingLatest.value) {
+      const data = dataExtent.value
+      if (data && viewDuration.value > 0) {
+        viewStart.value = Math.max(data[0], data[1] - viewDuration.value)
       }
-      buf.push(value)
     }
-
-    dataVersion.value++
-    pruneBufferedData()
-    if (followLatest.value) syncNavigatorToLatest()
-
     updateChart()
+    renderScrubber()
   },
 )
 
 onMounted(() => {
   rebuildPlot()
+  renderPlaceholder()
   resizeObserver = new ResizeObserver(syncPlotSize)
   if (chartAreaRef.value) resizeObserver.observe(chartAreaRef.value)
+  scrubberResizeObserver = new ResizeObserver(renderScrubber)
+  if (scrubberRef.value) scrubberResizeObserver.observe(scrubberRef.value)
   document.addEventListener('pointerdown', onDocumentPointerDown)
   document.addEventListener('keydown', onDocumentKeyDown)
 })
@@ -616,6 +942,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown)
   document.removeEventListener('keydown', onDocumentKeyDown)
   resizeObserver?.disconnect()
+  scrubberResizeObserver?.disconnect()
   plot?.destroy()
   plot = null
 })
@@ -676,54 +1003,19 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <label v-if="xMode === 'time'" class="flex items-center gap-1 shrink-0">
-        <span class="text-textMuted text-[11px]">窗口</span>
-        <select
-          :value="xWindowSec"
-          class="bg-bgBase text-textBase text-[11px] px-1.5 py-0.5 rounded border border-surfaceHover outline-none"
-          @change="onXWindowChange"
-        >
-          <option v-for="item in X_WINDOWS" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </option>
-        </select>
-      </label>
-
-      <label class="flex items-center gap-1 text-[11px] text-textMuted shrink-0 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          :checked="autoFit"
-          class="chart-checkbox"
-          @change="setAutoFit(($event.target as HTMLInputElement).checked)"
-        />
-        自动
-      </label>
-
-      <button
-        class="text-textMuted hover:text-textBase text-[11px] px-1.5 py-0.5 rounded hover:bg-surfaceHover transition-colors cursor-pointer shrink-0"
-        @click="fitView"
-      >
-        适合
-      </button>
-
-      <button
-        class="text-textMuted hover:text-textBase text-[11px] px-1.5 py-0.5 rounded hover:bg-surfaceHover transition-colors cursor-pointer shrink-0"
-        @click="resetZoom"
-      >
-        重置
-      </button>
-
-      <button
-        class="text-textMuted hover:text-textBase text-[11px] px-1.5 py-0.5 rounded hover:bg-surfaceHover transition-colors cursor-pointer shrink-0"
-        @click="clearData"
-      >
-        清除
-      </button>
     </div>
 
     <div ref="chartAreaRef" class="flex-1 min-h-0 relative">
+      <canvas v-if="xMode === 'time' && !hasData" ref="placeholderCanvasRef" class="absolute inset-0 h-full w-full" />
       <div v-show="xMode === 'time'" ref="plotHostRef" class="h-full w-full" />
       <canvas v-show="xMode === 'signal'" ref="canvasRef" class="absolute inset-0 h-full w-full" />
+      <button
+        v-if="manualYRange"
+        class="absolute top-1 right-1 z-10 text-[10px] px-1.5 py-0.5 rounded bg-bgBase/80 text-textMuted hover:text-textBase border border-surfaceHover hover:border-primary/50 transition-colors cursor-pointer"
+        @click="resetYFit"
+      >
+        Y 自动
+      </button>
       <div
         v-if="xMode === 'time' && selectedYKeys.length"
         class="absolute top-1 left-12 right-2 flex items-center gap-3 overflow-hidden pointer-events-none"
@@ -743,28 +1035,18 @@ onBeforeUnmount(() => {
     </div>
 
     <div
-      v-if="hasNavigator"
-      class="h-8 shrink-0 flex items-center gap-2 px-2 border-t border-surfaceHover bg-bgBase"
+      v-if="hasScrubber"
+      ref="scrubberRef"
+      class="h-8 shrink-0 relative border-t border-surfaceHover bg-bgBase"
+      @dblclick="onScrubberDblClick"
     >
-      <span class="text-textMuted text-[11px] font-mono shrink-0">{{ formatTime(historyRange[0]) }}</span>
-      <input
-        type="range"
-        :min="navigatorMin"
-        :max="navigatorMax"
-        :step="navigatorStep"
-        :value="followLatest ? navigatorMax : navEnd"
-        class="chart-navigator flex-1"
-        @input="onNavigatorInput"
+      <canvas
+        ref="scrubberCanvasRef"
+        class="absolute inset-0 w-full h-full"
+        @pointerdown="onScrubberPointerDown"
+        @pointermove="onScrubberPointerMoveCursor"
+        @wheel.prevent="onScrubberWheel"
       />
-      <span class="text-textMuted text-[11px] font-mono shrink-0">{{ formatTime(historyRange[1]) }}</span>
-      <span class="w-32 text-textBase text-[11px] font-mono text-center shrink-0">{{ navigatorWindowLabel }}</span>
-      <button
-        class="text-[11px] px-1.5 py-0.5 rounded transition-colors cursor-pointer shrink-0"
-        :class="followLatest ? 'text-primary bg-primaryDim' : 'text-textMuted hover:text-textBase hover:bg-surfaceHover'"
-        @click="jumpToLatest"
-      >
-        最新
-      </button>
     </div>
   </div>
 </template>
@@ -784,16 +1066,5 @@ onBeforeUnmount(() => {
 :deep(.u-hz .u-cursor-y),
 :deep(.u-vt .u-cursor-x) {
   border-bottom-color: rgb(var(--c-primary) / 0.9) !important;
-}
-
-.chart-checkbox {
-  width: 12px;
-  height: 12px;
-  accent-color: rgb(var(--c-primary));
-}
-
-.chart-navigator {
-  height: 14px;
-  accent-color: rgb(var(--c-primary));
 }
 </style>

@@ -5,9 +5,9 @@ import { useSimulationState } from '@/composables/useSimulationState'
 import { useToast } from '@/composables/useToast'
 import { useModelLoader } from '@/composables/useModelLoader'
 import { useControllerLoader } from '@/composables/useControllerLoader'
-import { matchController } from '@/models/tags'
+import { matchControllerFamily } from '@/models/controller-table'
 import type { ModelEntry } from '@/models/model-table'
-import type { ControllerEntry } from '@/models/controller-table'
+import type { ControllerCategory, ControllerFamily } from '@/models/controller-table'
 import AppLogo from './AppLogo.vue'
 import ControllerPopup from './ControllerPopup.vue'
 
@@ -71,7 +71,7 @@ function selectModel(m: ModelEntry) {
 
 // ── 控制器面板 ──
 const controllerExpanded = ref(false)
-const activeControllerCategory = ref<ControllerEntry['category']>('linear')
+const activeControllerCategory = ref<ControllerCategory>('linear')
 
 const controllerCategories = [
   { id: 'linear' as const, label: '线性' },
@@ -85,27 +85,21 @@ const controllerCategories = [
 const controllers = computed(() => {
   const model = currentEntry.value
   return getControllersByCategory(activeControllerCategory.value).map((c) => {
-    const compatible = model
-      ? matchController(
-          model.systemTags,
-          model.ioSpec.stateVars.map((v) => v.tags),
-          c.requiredSystemTags,
-          c.inputRequirements,
-        ).compatible
-      : true // 没选模型时全部显示为可用
-    return { ...c, compatible }
+    const match = matchControllerFamily(model, c)
+    return { ...c, compatible: match.compatible, reason: match.reason }
   })
 })
 
 // ── 控制器弹窗 ──
-const popupController = ref<ControllerEntry | null>(null)
+const popupController = ref<ControllerFamily | null>(null)
 
-function openControllerPopup(c: ControllerEntry) {
+function openControllerPopup(c: ControllerFamily) {
   popupController.value = c
 }
 
-function confirmController(id: string) {
-  loadController(id)
+function confirmController(variantId: string) {
+  if (!popupController.value) return
+  loadController(popupController.value.id, variantId)
   popupController.value = null
   controllerExpanded.value = false
 }
@@ -165,7 +159,7 @@ function exportOutput() {
         <span
           v-if="!controllerExpanded"
           class="absolute left-full ml-2 px-2 py-1 bg-bgBase text-textBase text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 border border-surfaceHover"
-        >控制器{{ currentController ? `: ${currentController.name}` : '' }}</span>
+        >控制器{{ currentController ? `: ${currentController.family.name}` : '' }}</span>
       </button>
 
       <div class="w-8 border-t border-surfaceHover my-1" />
@@ -293,7 +287,7 @@ function exportOutput() {
             @click="selectModel(m)"
           >
             <div class="flex items-start gap-3">
-              <span :class="m.icon" class="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <span class="w-5 h-5 text-primary shrink-0 mt-0.5 [&>svg]:w-full [&>svg]:h-full" v-html="m.icon" />
               <div class="min-w-0">
                 <h3 class="text-textBase text-sm font-medium">{{ m.name }}</h3>
                 <p class="text-textMuted text-xs mt-1 leading-relaxed">{{ m.description }}</p>
@@ -359,7 +353,7 @@ function exportOutput() {
             :key="c.id"
             class="w-full text-left p-4 rounded-lg transition-colors"
             :class="[
-              !c.compatible ? 'bg-bgBase border border-surfaceHover opacity-40 cursor-not-allowed' : currentController?.id === c.id ? 'bg-primary/10 border border-primary/30 cursor-pointer' : 'bg-bgBase border border-surfaceHover hover:border-primary/50 cursor-pointer',
+              !c.compatible ? 'bg-bgBase border border-surfaceHover opacity-55 cursor-not-allowed' : currentController?.family.id === c.id ? 'bg-primary/10 border border-primary/30 cursor-pointer' : 'bg-bgBase border border-surfaceHover hover:border-primary/50 cursor-pointer',
             ]"
             :disabled="!c.compatible"
             @click="c.compatible && openControllerPopup(c)"
@@ -369,12 +363,13 @@ function exportOutput() {
               <div class="min-w-0">
                 <h3 class="text-textBase text-sm font-medium">{{ c.name }}</h3>
                 <p class="text-textMuted text-xs mt-1 leading-relaxed">{{ c.description }}</p>
+                <p v-if="!c.compatible" class="text-warning text-[11px] mt-1">{{ c.reason }}</p>
                 <div class="flex flex-wrap gap-1.5 mt-2">
                   <span
-                    v-for="p in c.params"
-                    :key="p.name"
+                    v-for="variant in c.variants"
+                    :key="variant.id"
                     class="text-primary/70 text-[11px] bg-primary/10 px-2 py-0.5 rounded font-mono"
-                  >{{ p.name }}={{ p.value }}</span>
+                  >{{ variant.name }}</span>
                 </div>
               </div>
             </div>
@@ -383,7 +378,7 @@ function exportOutput() {
         </div>
         <div v-if="currentController" class="px-5 py-3 border-t border-surfaceHover shrink-0">
           <p class="text-textMuted text-xs">当前控制器</p>
-          <p class="text-primary text-sm font-medium truncate mt-0.5">{{ currentController.name }}</p>
+          <p class="text-primary text-sm font-medium truncate mt-0.5">{{ currentController.family.name }} / {{ currentController.variant.name }}</p>
         </div>
       </div>
     </Transition>
@@ -391,10 +386,10 @@ function exportOutput() {
 
   <ControllerPopup
     v-if="popupController"
-    :controller="popupController"
+    :family="popupController"
     :model="currentEntry"
     @close="popupController = null"
-    @select="confirmController(popupController!.id)"
+    @select="confirmController"
   />
 </template>
 
