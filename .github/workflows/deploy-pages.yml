@@ -4,6 +4,11 @@ on:
   push:
     branches: ['main']
   workflow_dispatch:
+    inputs:
+      use_base_path:
+        description: '使用仓库名作为 base path（直连 GitHub Pages 时开启，CDN 代理时关闭）'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,7 +50,7 @@ jobs:
       - name: Build
         run: pnpm run build-only
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          BASE_PATH: ${{ inputs.use_base_path && format('/{0}/', github.event.repository.name) || '' }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
