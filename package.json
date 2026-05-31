@@ -15,7 +15,8 @@
     "lint:eslint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli src/",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:convergence": "OL_CONVERGENCE=1 vitest run src/modules/models/__tests__/controller-convergence.test.ts"
   },
   "dependencies": {
     "monaco-editor": "^0.55.1",
