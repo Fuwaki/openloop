@@ -25,6 +25,8 @@
 ```
 src/
 ├── components/              # UI 组件
+│   ├── ui/
+│   │   └── UiToggle.vue     # 开关组件
 │   ├── Sidebar.vue          # 侧栏（模型/控制器选择器）
 │   ├── CodeEditor.vue       # Monaco 编辑器封装
 │   ├── ControllerPopup.vue  # 控制器变种选择弹窗
@@ -33,28 +35,37 @@ src/
 │   ├── ResizablePanel.vue   # splitpanes 封装
 │   ├── RightPanel.vue       # 右侧检查器面板
 │   ├── SettingsModal.vue    # 设置弹窗（主题/仿真参数）
+│   ├── AppLogo.vue          # 应用 Logo
+│   ├── ToastContainer.vue   # 通知提示容器
+│   ├── ViewTabs.vue         # 视图预设切换标签
 │   └── layout-tree.ts       # 面板树结构类型定义
 │
-├── composables/             # Vue 组合式函数（核心业务逻辑）
-│   ├── useSimulationRunner.ts  # 仿真循环（requestAnimationFrame tick）
-│   ├── useSimulationState.ts   # 全局仿真状态（状态向量、历史、统计）
-│   ├── usePyodide.ts           # Pyodide 生命周期管理
-│   ├── useCodeExecutor.ts      # Python 代码执行
-│   ├── useControllerBridge.ts  # TS ↔ Python controller 桥接
-│   ├── useCodeGenerator.ts     # 控制器代码脚手架生成
-│   ├── useCodeAnalyzer.ts      # Python 代码静态分析（调用 analyzer.py）
-│   ├── useModelLoader.ts       # 模型加载与状态管理
-│   ├── useControllerLoader.ts  # 控制器加载
-│   ├── useOpenLoopModule.ts    # openloop Python 模块注入
-│   ├── useUserParams.ts        # 用户参数（ol.parameter）同步
-│   ├── usePackageCache.ts      # Pyodide WASM 包 IndexedDB 缓存
-│   ├── useLayout.ts            # 面板布局管理
-│   └── useTheme.ts             # 主题（色相/深浅色）管理
-│
-├── models/                  # 注册表（模型 & 控制器元数据）
-│   ├── model-table.ts       # 被控模型注册表
-│   ├── controller-table.ts  # 控制器族注册表
-│   └── tags.ts              # 系统标签 & 匹配结果类型
+├── modules/                 # 业务模块（内聚的 composable 集合）
+│   ├── app/                 # 应用层
+│   │   ├── layout.ts        # 面板布局管理
+│   │   ├── settings.ts      # 仿真参数设置
+│   │   ├── theme.ts         # 主题（色相/深浅色）管理
+│   │   └── toast.ts         # 通知提示
+│   ├── models/              # 模型 & 控制器元数据
+│   │   ├── controller-table.ts  # 控制器族注册表
+│   │   ├── model-table.ts       # 被控模型注册表
+│   │   ├── model-loader.ts      # 模型加载与状态管理
+│   │   └── tags.ts              # 系统标签 & 匹配结果类型
+│   ├── python/              # Pyodide / Python 运行时
+│   │   ├── pyodide.ts       # Pyodide 生命周期管理
+│   │   ├── bridge.ts        # TS ↔ Python controller 桥接
+│   │   ├── openloop.ts      # openloop Python 模块注入
+│   │   ├── cache.ts         # Pyodide WASM 包 IndexedDB 缓存
+│   │   └── packages.ts      # 包管理
+│   └── simulation/          # 仿真逻辑
+│       ├── runner.ts        # 仿真循环（requestAnimationFrame tick）
+│       ├── state.ts         # 全局仿真状态（状态向量、历史、统计）
+│       ├── code-generator.ts    # 控制器代码脚手架生成
+│       ├── analyzer.ts      # Python 代码静态分析
+│       ├── analysis-sync.ts # 分析结果同步
+│       ├── controller-loader.ts # 控制器加载
+│       ├── executor.ts      # 代码执行器
+│       └── user-params.ts   # 用户参数（ol.parameter）同步
 │
 ├── simulation/              # 仿真引擎（纯 TypeScript，无 Vue 依赖）
 │   ├── types.ts             # SystemModel / ODESolver 接口
@@ -66,8 +77,7 @@ src/
 │       ├── types.ts         # PlantModel / VariableDef 接口
 │       ├── massSpring.ts    # 质量-弹簧-阻尼
 │       ├── firstOrder.ts    # 一阶惯性系统
-│       ├── invertedPendulum.ts  # 倒立摆
-│       └── index.ts         # createPlant 工厂函数
+│       └── invertedPendulum.ts  # 倒立摆
 │
 ├── sandbox/                 # 2D 物理沙盒（PixiJS）
 │   ├── types.ts             # SandboxScene / Drawable / RenderContext
@@ -92,7 +102,9 @@ src/
 │   ├── PanelSandbox.vue     # 2D 沙盒
 │   ├── PanelEditor.vue      # 代码编辑器
 │   ├── PanelOutput.vue      # 输出控制台
-│   └── PanelParams.vue      # 参数滑块面板
+│   ├── PanelParams.vue      # 参数滑块面板
+│   ├── PanelEmpty.vue       # 空面板占位
+│   └── PanelFrame.vue       # 内嵌 iframe 面板
 │
 ├── python/                  # Python 源码（在 Pyodide 中运行）
 │   ├── openloop.py          # openloop 模块（parameter / status）
@@ -100,6 +112,9 @@ src/
 │   └── controllers/         # 内置控制器模板
 │       ├── pid.py / pd.py / sliding_mode.py / ...
 │       └── empty.py         # 空控制器（默认模板）
+│
+├── views/                   # 视图预设
+│   └── registry.ts          # 预设布局注册表（仿真/编码工作区）
 │
 └── themes/                  # Monaco 编辑器主题
     ├── monaco-dark.ts
@@ -185,7 +200,7 @@ export function createMyModel(params?: { a?: number; b?: number }): PlantModel {
 ### 2. 在 model-table.ts 注册
 
 ```typescript
-// src/models/model-table.ts
+// src/modules/models/model-table.ts
 import { createMyModel } from '@/simulation/plants/myModel'
 import iconMyModel from '@/assets/icons/models/my-model.svg?raw'
 
@@ -219,16 +234,23 @@ import iconMyModel from '@/assets/icons/models/my-model.svg?raw'
     input: 'u',
     inputGainSign: 1,  // 正输入让 x 正向变化
   },
+  benchmark: {
+    initState: [1.0, 0.0],   // 初始状态，归一化误差应接近 1.0
+    settlingBand: 0.05,       // 误差进入此带视为收敛（±5%）
+  },
   createPlant: (p) => createMyModel(p as { a?: number; b?: number }),
   createScene: (frame, p) => createMyModelScene(frame, p),  // 可选
 }
 ```
 
 字段说明：
+- `category` — `'linear'` / `'nonlinear'` / `'custom'`（用户自定义模型）
 - `systemTags` — 系统标签，用于控制器兼容性匹配。`'linear'` / `'nonlinear'`，可自定义
+- `params[].env` — 可选，标记为环境参数（如重力），在环境配置 tab 中显示而非模型参数面板
 - `ioSpec` — I/O 元数据，驱动代码生成器自动解包状态变量
 - `controlObjective.derivativeChain` — 按阶数排列的被控量导数链。一阶系统 `['x']`，二阶 `['x', 'v']`
 - `controlObjective.inputGainSign` — 正控制输入是否让被控量正向变化。倒立摆为 `-1`（正力让摆杆远离目标）
+- `benchmark` — 收敛测试的"考题"配置。`initState` 是初始状态向量（归一化误差应接近 1.0），`settlingBand` 是误差收敛带（如 0.05 = ±5%）。用于 `pnpm test:convergence`
 
 ### 3. SVG 图标
 
@@ -275,7 +297,7 @@ export function createMyModelScene(frame: SandboxFrame, params?: Record<string, 
 | `joint` | `JointData` | 铰接点 |
 | `tank` | `TankData` | 容器（带液位） |
 | `vector` | `VectorData` | 箭头向量（力/速度） |
-| `scalarLabel` | `ScalarLabelData` | 标量数值标签 |
+| `scalarLabel` | `ScalarLabelData` | 标量数值标签（渲染器内置，非注册表） |
 
 如果需要新的基元类型，参见下方"贡献新绘图基元"。
 
@@ -329,11 +351,11 @@ def controller(state, t):
 ### 2. 在 controller-table.ts 注册
 
 ```typescript
-// src/models/controller-table.ts
+// src/modules/models/controller-table.ts
 import myControllerCode from '@/python/controllers/my_controller.py?raw'
 import myControllerIcon from '@/assets/icons/controllers/my_controller.svg?raw'
 
-// 在 controllerFamilies 数组中添加：
+// 在 controllerFamilies: ControllerFamily[] 数组中添加：
 {
   id: 'my-controller',
   name: '我的控制器',
@@ -365,7 +387,56 @@ import myControllerIcon from '@/assets/icons/controllers/my_controller.svg?raw'
 - `generationMode` — `'generic'` 表示模板适用于所有兼容模型；`'model-specific'` 表示需要每个模型的专用模板
 - `modelTemplates` — `model-specific` 模式下，按模型 id 映射模板代码：`{ 'inverted-pendulum': code }`
 
-**兼容性匹配是自动的。** 平台根据 `minOrder`、`maxOrder`、`requiredSystemTags`、`generationMode` 自动判断控制器与模型的兼容性。不兼容的控制器会在 UI 中被标记为禁用，并显示原因。不需要写任何 `if/else` 判断代码。
+**兼容性匹配是自动的。** 平台根据 `minOrder`、`maxOrder`、`requiredSystemTags`、`generationMode` 自动判断控制器与模型的兼容性。不兼容的控制器会在 UI 中被标记为禁用，并显示原因。不需要写任何 `if/else` 判断代码。匹配结果类型为 `MatchResult { compatible: boolean; reason?: string }`（定义在 `tags.ts`）。
+
+### 3. 验证控制器效果（收敛测试）
+
+贡献控制器后，运行收敛测试查看你的控制器在所有兼容模型上的表现：
+
+```bash
+pnpm test:convergence
+```
+
+测试会遍历所有控制器 × 模型组合，用真实模板跑闭环仿真（TS plant + TS RK4 + Pyodide 控制器），输出类似：
+
+```
+┌─ 质量-弹簧-阻尼
+│
+│  控制器                      │ tier        │ 状态         │     归一化errF │      IAE │ settling │ overshoot │   RMS(u)
+│  ─────────────────────────────────────────────────────────────────────────────────────────────────────
+│  PID / 状态 PID             │ implemented │ partial    │       0.080 │     0.57 │      561 │     0.330 │     3.20
+│  LQR / 二阶目标 LQR          │ implemented │ converged  │       0.008 │     0.38 │      327 │     0.353 │     8.30
+│  ...
+└────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌─ 汇总（按控制器）
+│  控制器                      │ 质量-弹簧-阻尼     │ 一阶惯性系统       │ 倒立摆
+│  LQR / 二阶目标 LQR          │ converged    │ —            │ converged
+│  ...
+```
+
+**指标说明：**
+
+| 指标 | 含义 | 判断标准 |
+|------|------|---------|
+| 状态 | 收敛/部分/发散/骨架 | `converged` = 误差进入 settlingBand |
+| 归一化 errF | 最终误差 / 初始误差 | < settlingBand 即收敛，越小越好 |
+| IAE | 积分绝对误差 | 越小越好 |
+| settling | 误差首次进入收敛带的步数 | 越小越好 |
+| overshoot | 反向超调 / 初始误差 | 越小越好 |
+| RMS(u) | 控制量均方根 | 越小越好（能耗指标） |
+
+**tier 说明：**
+
+| tier | 含义 | 期望行为 |
+|------|------|---------|
+| `implemented` | 生产级实现 | 应在所有兼容模型上收敛 |
+| `example` | 示例级 | 能跑但不一定收敛，提供参考 |
+| `skeleton` | 骨架 | 仅验证语法正确，不要求收敛 |
+
+通过 `benchmarkTier` 字段（在 `controller-table.ts` 中设置）标记你的控制器成熟度。新贡献的控制器如果参数还没调好，可以先标记为 `example`。
+
+> **注意：** 此测试使用模型的 TS plant（`createPlant()`）和默认参数，与模型表中的 `benchmark.initState` 组合。如果你的控制器对参数敏感，可以在模板中用 `ol.parameter()` 设置合理的默认值。
 
 ## 贡献新绘图基元
 
@@ -409,7 +480,7 @@ register<MyShapeData>('myShape', drawMyShape)
 
 ### 代码生成
 
-- 代码生成器（`useCodeGenerator.ts`）基于模型的 `ioSpec` 和 `controlObjective` 自动生成
+- 代码生成器（`src/modules/simulation/code-generator.ts`）基于模型的 `ioSpec` 和 `controlObjective` 自动生成
 - 模板中使用 `q`、`q_dot`、`e`、`e_dot` 别名，不要用 `x`、`v`（旧约定）
 
 ### 样式
@@ -422,10 +493,11 @@ register<MyShapeData>('myShape', drawMyShape)
 
 ```bash
 pnpm install
-pnpm dev          # 启动开发服务器
-pnpm type-check   # 类型检查
-pnpm lint         # lint + 自动修复
-pnpm test:run     # 运行测试
+pnpm dev              # 启动开发服务器
+pnpm type-check       # 类型检查
+pnpm lint             # lint + 自动修复
+pnpm test:run         # 运行测试
+pnpm test:convergence # 收敛测试（控制器 × 模型闭环仿真报告）
 ```
 
 提交信息使用 conventional commit 格式，中文正文：
@@ -444,3 +516,5 @@ refactor(sandbox): 重构 XXX 绘图逻辑
 - [ ] 新增模型/控制器在侧栏中可见且可选
 - [ ] 兼容性标记正确（不兼容的控制器应被禁用）
 - [ ] 代码生成的脚手架代码正确（状态变量解包、别名定义）
+- [ ] 新增模型已配置 `benchmark`（`initState` + `settlingBand`）
+- [ ] 新增控制器已设置 `benchmarkTier`，`pnpm test:convergence` 无崩溃/NaN

@@ -57,8 +57,7 @@
 
 ```python
 def controller(state, t):
-    x, v = state[0], state[1]   # 平台已经帮你解包好了
-    e = ref - x                  # 误差也定义好了
+    # 平台自动解包状态变量并定义 q, q_dot, e, e_dot 等别名
     Kp = ol.parameter('Kp', 10, min=0, max=100)
     Kd = ol.parameter('Kd', 2, min=0, max=20)
     return Kp * e + Kd * e_dot
