@@ -6,16 +6,19 @@ import { createFirstOrder } from '@/simulation/plants/firstOrder'
 import { createInvertedPendulum } from '@/simulation/plants/invertedPendulum'
 import { createDcMotor } from '@/simulation/plants/dcMotor'
 import { createBallAndBeam } from '@/simulation/plants/ballAndBeam'
+import { createMaglev } from '@/simulation/plants/maglev'
 import { createMassSpringScene } from '@/sandbox/scenes/massSpring'
 import { createFirstOrderScene } from '@/sandbox/scenes/firstOrder'
 import { createInvertedPendulumScene } from '@/sandbox/scenes/invertedPendulum'
 import { createDcMotorScene } from '@/sandbox/scenes/dcMotor'
 import { createBallAndBeamScene } from '@/sandbox/scenes/ballAndBeam'
+import { createMaglevScene } from '@/sandbox/scenes/maglev'
 import iconMassSpring from '@/assets/icons/models/mass-spring-damper.svg?raw'
 import iconFirstOrder from '@/assets/icons/models/first-order.svg?raw'
 import iconInvertedPendulum from '@/assets/icons/models/inverted-pendulum.svg?raw'
 import iconDcMotor from '@/assets/icons/models/dc-motor.svg?raw'
 import iconBallAndBeam from '@/assets/icons/models/ball-and-beam.svg?raw'
+import iconMaglev from '@/assets/icons/models/maglev.svg?raw'
 
 /** 参数定义 */
 export interface ParamDef {
@@ -284,6 +287,44 @@ const modelTable: ModelEntry[] = [
     createPlant: (p) => createBallAndBeam(p as { g?: number; J_beam?: number; L?: number }),
     createScene: (frame, p) => createBallAndBeamScene(frame, p),
   },
+  {
+    id: 'maglev',
+    name: '磁悬浮',
+    category: 'nonlinear',
+    description: '电磁铁悬浮球体，开环不稳定非线性系统',
+    icon: iconMaglev,
+    params: [
+      { name: 'g', value: 9.81, min: 0, max: 20, step: 0.1, env: true },
+      { name: 'k', value: 0.5, min: 0.01, max: 10, step: 0.01 },
+      { name: 'y_eq', value: 0.5, min: 0.1, max: 2, step: 0.01 },
+    ],
+    systemTags: ['nonlinear'],
+    ioSpec: {
+      stateVars: [
+        { name: 'y', unit: 'm', description: '高度' },
+        { name: 'v', unit: 'm/s', description: '速度' },
+      ],
+      outputs: [
+        { name: 'i', unit: 'A', description: '电流' },
+      ],
+    },
+    controlObjective: {
+      id: 'height-regulation',
+      name: '悬浮高度调节',
+      description: '控制球体高度 y 收敛到平衡位置 y_eq',
+      reference: 0.5,
+      derivativeChain: ['y', 'v'],
+      input: 'i',
+      inputGainSign: -1,
+    },
+    benchmark: {
+      initState: [0.7, 0.0],
+      settlingBand: 0.05,
+    },
+    createPlant: (p) => createMaglev(p as { g?: number; k?: number; y_eq?: number }),
+    createScene: (frame, p) => createMaglevScene(frame, p),
+  },
+]
 ]
 
 // ── 查询函数 ──
