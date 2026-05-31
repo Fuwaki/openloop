@@ -325,7 +325,6 @@ const modelTable: ModelEntry[] = [
     createScene: (frame, p) => createMaglevScene(frame, p),
   },
 ]
-]
 
 // ── 查询函数 ──
 
