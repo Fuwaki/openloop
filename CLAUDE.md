@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm test` — Vitest watch 模式
 - `pnpm test:run` — Vitest 单次运行
 
-单个测试文件：`pnpm test:run src/composables/__tests__/usePyodide.test.ts`
+单个测试文件：`pnpm test:run src/modules/python/__tests__/usePyodide.test.ts`
 
 ## Tech Stack
 
@@ -42,15 +42,15 @@ primary: 'rgb(var(--c-primary))'  // 支持 bg-primary/50 透明度写法
 
 不需要透明度的颜色直接用 hex：`--c-text-muted: #888888` → `'var(--c-text-muted)'`
 
-### Pyodide Composable
+### Pyodide 模块
 
-`src/composables/usePyodide.ts` 封装了 Pyodide 的生命周期：
+`src/modules/python/pyodide.ts` 封装了 Pyodide 的生命周期：
 - `init()` — 加载 WASM 运行时（~7MB），完成后 `isReady` 变为 true
 - `runPython(code)` — 同步执行，返回 `{ result, stdout, stderr, error }`
 - `runPythonAsync(code)` — 异步版本
 - Pyodide 内置 numpy，无需额外安装
 
-注意：测试中 Pyodide 必须 mock（WASM 无法在 Node 运行），见 `src/composables/__tests__/usePyodide.test.ts`
+注意：测试中 Pyodide 必须 mock（WASM 无法在 Node 运行），见 `src/modules/python/__tests__/usePyodide.test.ts`
 
 ### 面板布局
 
