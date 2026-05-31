@@ -5,14 +5,17 @@ import { createMassSpring } from '@/simulation/plants/massSpring'
 import { createFirstOrder } from '@/simulation/plants/firstOrder'
 import { createInvertedPendulum } from '@/simulation/plants/invertedPendulum'
 import { createDcMotor } from '@/simulation/plants/dcMotor'
+import { createBallAndBeam } from '@/simulation/plants/ballAndBeam'
 import { createMassSpringScene } from '@/sandbox/scenes/massSpring'
 import { createFirstOrderScene } from '@/sandbox/scenes/firstOrder'
 import { createInvertedPendulumScene } from '@/sandbox/scenes/invertedPendulum'
 import { createDcMotorScene } from '@/sandbox/scenes/dcMotor'
+import { createBallAndBeamScene } from '@/sandbox/scenes/ballAndBeam'
 import iconMassSpring from '@/assets/icons/models/mass-spring-damper.svg?raw'
 import iconFirstOrder from '@/assets/icons/models/first-order.svg?raw'
 import iconInvertedPendulum from '@/assets/icons/models/inverted-pendulum.svg?raw'
 import iconDcMotor from '@/assets/icons/models/dc-motor.svg?raw'
+import iconBallAndBeam from '@/assets/icons/models/ball-and-beam.svg?raw'
 
 /** 参数定义 */
 export interface ParamDef {
@@ -241,6 +244,45 @@ const modelTable: ModelEntry[] = [
     },
     createPlant: (p) => createDcMotor(p as { J?: number; b?: number; Kt?: number; Ke?: number; R?: number; L?: number }),
     createScene: (frame, p) => createDcMotorScene(frame, p),
+  },
+  {
+    id: 'ball-and-beam',
+    name: '球杆系统',
+    category: 'nonlinear',
+    description: '球在可倾斜梁上滚动，欠驱动非线性系统',
+    icon: iconBallAndBeam,
+    params: [
+      { name: 'g', value: 9.81, min: 0, max: 20, step: 0.1, env: true },
+      { name: 'J_beam', value: 0.5, min: 0.01, max: 10, step: 0.01 },
+      { name: 'L', value: 1.0, min: 0.2, max: 3, step: 0.1 },
+    ],
+    systemTags: ['nonlinear'],
+    ioSpec: {
+      stateVars: [
+        { name: 'theta', unit: 'rad', description: '梁角度' },
+        { name: 'omega', unit: 'rad/s', description: '梁角速度' },
+        { name: 'x_b', unit: 'm', description: '球位置' },
+        { name: 'v_b', unit: 'm/s', description: '球速度' },
+      ],
+      outputs: [
+        { name: 'tau', unit: 'N·m', description: '梁力矩' },
+      ],
+    },
+    controlObjective: {
+      id: 'beam-angle-regulation',
+      name: '梁角度调节',
+      description: '控制梁角度 theta 收敛到 0，间接稳定球位置',
+      reference: 0,
+      derivativeChain: ['theta', 'omega'],
+      input: 'tau',
+      inputGainSign: 1,
+    },
+    benchmark: {
+      initState: [0.0, 0.0, 0.5, 0.0],
+      settlingBand: 0.05,
+    },
+    createPlant: (p) => createBallAndBeam(p as { g?: number; J_beam?: number; L?: number }),
+    createScene: (frame, p) => createBallAndBeamScene(frame, p),
   },
 ]
 

@@ -1,0 +1,11 @@
+<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 支点 -->
+  <circle cx="10" cy="10" r="1.2" fill="currentColor" fill-opacity="0.2"/>
+  <!-- 梁 -->
+  <line x1="3" y1="13" x2="17" y2="7" stroke-width="1.6"/>
+  <!-- 球 -->
+  <circle cx="14" cy="8.2" r="1.8" fill="currentColor" fill-opacity="0.25"/>
+  <!-- 支架 -->
+  <line x1="10" y1="11.2" x2="10" y2="17"/>
+  <line x1="7" y1="17" x2="13" y2="17"/>
+</svg>
