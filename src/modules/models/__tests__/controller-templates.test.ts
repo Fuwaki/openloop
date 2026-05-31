@@ -17,7 +17,7 @@ import { getModelEntry } from '@/modules/models/model-table'
 let pyodide: Awaited<ReturnType<typeof loadPyodide>>
 let loadPyodide: (typeof import('pyodide'))['loadPyodide']
 
-const MODEL_IDS = ['mass-spring-damper', 'first-order', 'inverted-pendulum']
+const MODEL_IDS = ['mass-spring-damper', 'first-order', 'inverted-pendulum', 'dc-motor', 'ball-and-beam', 'maglev', 'tank-level', 'double-pendulum']
 
 // ── helpers ──
 
