@@ -4,12 +4,15 @@ import type { SystemTag } from './tags'
 import { createMassSpring } from '@/simulation/plants/massSpring'
 import { createFirstOrder } from '@/simulation/plants/firstOrder'
 import { createInvertedPendulum } from '@/simulation/plants/invertedPendulum'
+import { createDcMotor } from '@/simulation/plants/dcMotor'
 import { createMassSpringScene } from '@/sandbox/scenes/massSpring'
 import { createFirstOrderScene } from '@/sandbox/scenes/firstOrder'
 import { createInvertedPendulumScene } from '@/sandbox/scenes/invertedPendulum'
+import { createDcMotorScene } from '@/sandbox/scenes/dcMotor'
 import iconMassSpring from '@/assets/icons/models/mass-spring-damper.svg?raw'
 import iconFirstOrder from '@/assets/icons/models/first-order.svg?raw'
 import iconInvertedPendulum from '@/assets/icons/models/inverted-pendulum.svg?raw'
+import iconDcMotor from '@/assets/icons/models/dc-motor.svg?raw'
 
 /** 参数定义 */
 export interface ParamDef {
@@ -197,6 +200,47 @@ const modelTable: ModelEntry[] = [
     },
     createPlant: (p) => createInvertedPendulum(p as { M?: number; m?: number; l?: number; g?: number }),
     createScene: (frame, p) => createInvertedPendulumScene(frame, p),
+  },
+  {
+    id: 'dc-motor',
+    name: '直流电机',
+    category: 'linear',
+    description: '直流电机模型，电气-机械耦合系统',
+    icon: iconDcMotor,
+    params: [
+      { name: 'J', value: 0.01, min: 0.001, max: 1, step: 0.001 },
+      { name: 'b', value: 0.1, min: 0, max: 2, step: 0.01 },
+      { name: 'Kt', value: 0.01, min: 0.001, max: 1, step: 0.001 },
+      { name: 'Ke', value: 0.01, min: 0.001, max: 1, step: 0.001 },
+      { name: 'R', value: 1, min: 0.1, max: 20, step: 0.1 },
+      { name: 'L', value: 0.5, min: 0.01, max: 10, step: 0.01 },
+    ],
+    systemTags: ['linear'],
+    ioSpec: {
+      stateVars: [
+        { name: 'theta', unit: 'rad', description: '转角' },
+        { name: 'omega', unit: 'rad/s', description: '角速度' },
+        { name: 'i', unit: 'A', description: '电流' },
+      ],
+      outputs: [
+        { name: 'V', unit: 'V', description: '电压' },
+      ],
+    },
+    controlObjective: {
+      id: 'angle-regulation',
+      name: '转角调节',
+      description: '控制电机转角 theta 收敛到 0',
+      reference: 0,
+      derivativeChain: ['theta', 'omega'],
+      input: 'V',
+      inputGainSign: 1,
+    },
+    benchmark: {
+      initState: [1.0, 0.0, 0.0],
+      settlingBand: 0.05,
+    },
+    createPlant: (p) => createDcMotor(p as { J?: number; b?: number; Kt?: number; Ke?: number; R?: number; L?: number }),
+    createScene: (frame, p) => createDcMotorScene(frame, p),
   },
 ]
 
