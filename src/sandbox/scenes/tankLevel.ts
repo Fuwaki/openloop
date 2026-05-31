@@ -1,6 +1,6 @@
 import type { SandboxFrame, SandboxScene } from '../types'
 
-export function createTankLevelScene(frame: SandboxFrame, params?: Record<string, number>): SandboxScene {
+export function createTankLevelScene(frame: SandboxFrame, _params?: Record<string, number>): SandboxScene {
   const h = frame.state.h ?? 0
   const u = frame.state.u ?? 0
 

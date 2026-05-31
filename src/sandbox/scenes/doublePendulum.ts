@@ -3,8 +3,8 @@ import type { SandboxFrame, SandboxScene } from '../types'
 export function createDoublePendulumScene(frame: SandboxFrame, params?: Record<string, number>): SandboxScene {
   const theta1 = frame.state.theta1 ?? 0
   const theta2 = frame.state.theta2 ?? 0
-  const omega1 = frame.state.omega1 ?? 0
-  const omega2 = frame.state.omega2 ?? 0
+  const _omega1 = frame.state.omega1 ?? 0
+  const _omega2 = frame.state.omega2 ?? 0
   const l1 = params?.l1 ?? 1.0
   const l2 = params?.l2 ?? 1.0
 
