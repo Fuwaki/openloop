@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { generateControllerCode } from '@/composables/useCodeGenerator'
-import { isSimulationRunning } from '@/composables/useSimulationState'
+import { generateControllerCode, isSimulationRunning } from '@/modules/simulation'
 import {
   matchControllerVariant,
-  type ControllerFamily,
-  type ControllerVariant,
-} from '@/models/controller-table'
-import type { ModelEntry } from '@/models/model-table'
+} from '@/modules/models'
+import type { ModelEntry, ControllerFamily, ControllerVariant } from '@/modules/models'
 
 const props = defineProps<{
   family: ControllerFamily

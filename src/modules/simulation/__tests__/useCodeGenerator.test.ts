@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { generateControllerCode } from '../useCodeGenerator'
-import { getControllerVariant, matchControllerVariant } from '@/models/controller-table'
-import { getModelEntry } from '@/models/model-table'
+import { generateControllerCode } from '../code-generator'
+import { getControllerVariant, matchControllerVariant } from '@/modules/models/controller-table'
+import { getModelEntry } from '@/modules/models/model-table'
 
 describe('useCodeGenerator', () => {
   it('倒立摆 PD 使用摆角目标而不是小车位置目标', () => {

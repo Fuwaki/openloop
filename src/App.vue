@@ -7,15 +7,25 @@ import RightPanel from './components/RightPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import { getViewPresets, type ViewPreset } from './views/registry'
-import { useModelLoader } from './composables/useModelLoader'
-import { DEFAULT_MODEL_ID } from './models/model-table'
+import { useModelLoader } from './modules/models'
+import { DEFAULT_MODEL_ID } from './modules/models'
+import { injectSimulationStop } from './modules/models'
+import { useSimulationRunner } from './modules/simulation'
+import { injectGetPlant } from './modules/simulation'
+import { setOutputSink } from './modules/python'
+import { appendOutput } from './modules/simulation'
 
 const showSettings = ref(false)
 const currentView = ref<ViewPreset>(getViewPresets()[0]!)
 
 // 默认加载弹簧振子模型
-const { loadModel } = useModelLoader()
+const { loadModel, currentPlant } = useModelLoader()
 void loadModel(DEFAULT_MODEL_ID)
+
+// 注入依赖
+injectSimulationStop(() => useSimulationRunner().stop())
+injectGetPlant(() => currentPlant.value)
+setOutputSink(appendOutput)
 </script>
 
 <template>

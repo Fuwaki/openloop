@@ -1,8 +1,8 @@
 import { ref, shallowRef } from 'vue'
 import type { PyodideAPI } from 'pyodide'
-import { useToast } from './useToast'
-import { installFetchCache } from './usePackageCache'
-import { useSettings } from './useSettings'
+import { useToast } from '@/modules/app'
+import { installFetchCache } from './cache'
+import { useSettings } from '@/modules/app'
 
 const DEFAULT_PYODIDE_INDEX_URL = 'https://cdn.jsdelivr.net/pyodide/v0.29.4/full/'
 
@@ -19,10 +19,16 @@ const isReady = ref(false)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 let initPromise: Promise<void> | null = null
+let retryCount = 0
+const MAX_RETRIES = 3
 
 async function init(indexURL?: string, packages?: string[]) {
   if (pyodide.value) return
   if (initPromise) return initPromise
+  if (retryCount >= MAX_RETRIES) {
+    error.value = `Python 运行时加载失败，已重试 ${MAX_RETRIES} 次`
+    return
+  }
 
   installFetchCache()
   isLoading.value = true
@@ -38,7 +44,6 @@ async function init(indexURL?: string, packages?: string[]) {
     if (loadingId !== null) remove(loadingId)
     loadingId = null
     toast(msg, 'info', 0)
-    // 最新一条 toast 就是刚加入的
     loadingId = toasts.value[toasts.value.length - 1]?.id ?? null
   }
 
@@ -61,9 +66,11 @@ async function init(indexURL?: string, packages?: string[]) {
 
   try {
     await initPromise
+    retryCount = 0
     if (loadingId !== null) remove(loadingId)
     toast('Python 运行时就绪', 'info', 2000)
   } catch (e) {
+    retryCount++
     error.value = e instanceof Error ? e.message : String(e)
     initPromise = null
     if (loadingId !== null) remove(loadingId)
@@ -116,6 +123,7 @@ function reset() {
   isLoading.value = false
   error.value = null
   initPromise = null
+  retryCount = 0
 }
 
 async function restart(indexURL?: string) {
@@ -123,10 +131,6 @@ async function restart(indexURL?: string) {
   await init(indexURL)
 }
 
-/**
- * Pyodide 运行时 — 单例。
- * 所有调用方共享同一个 Pyodide 实例。
- */
 export function usePyodide() {
   return { pyodide, isReady, isLoading, error, init, runPython, runPythonAsync, reset, restart }
 }

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { useModelLoader } from '@/composables/useModelLoader'
-import { useUserParams } from '@/composables/useUserParams'
-import { updateParamValues } from '@/composables/useOpenLoopModule'
+import { useModelLoader } from '@/modules/models'
+import { useUserParams } from '@/modules/simulation'
+import { updateParamValues } from '@/modules/python'
 
 export interface Param {
   name: string

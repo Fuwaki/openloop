@@ -9,12 +9,6 @@ export interface SystemModel {
   output?(t: number, state: Float64Array, input: Float64Array): Float64Array
 }
 
-/** 求解器配置 */
-export interface SolverConfig {
-  /** 积分步长 (秒) */
-  dt: number
-}
-
 /** 求解器接口 */
 export interface ODESolver {
   /** 推进一个时间步，返回新状态 */
@@ -25,11 +19,4 @@ export interface ODESolver {
     input: Float64Array,
     dt: number,
   ): Float64Array
-}
-
-/** 仿真步结果 */
-export interface StepResult {
-  t: number
-  state: Float64Array
-  output: Float64Array
 }

@@ -4,13 +4,12 @@ import {
   getControllersByCategory,
   matchControllerVariant,
   type ControllerSelection,
-} from '@/models/controller-table'
-import { useModelLoader } from './useModelLoader'
-import { generateControllerCode } from './useCodeGenerator'
-import { currentCode, controllerStatusNames, isSimulationRunning } from './useSimulationState'
-import { useSimulationRunner } from './useSimulationRunner'
-import { analyze } from './useCodeAnalyzer'
-import { syncUserParams } from './useUserParams'
+} from '@/modules/models/controller-table'
+import { useModelLoader } from '@/modules/models/model-loader'
+import { generateControllerCode } from './code-generator'
+import { setCurrentCode, isSimulationRunning } from './state'
+import { useSimulationRunner } from './runner'
+import { syncAnalysisResult } from './analysis-sync'
 
 const currentController = ref<ControllerSelection | null>(null)
 
@@ -22,13 +21,9 @@ async function loadController(familyId: string, variantId: string): Promise<bool
   if (currentEntry.value) {
     const match = matchControllerVariant(currentEntry.value, selection.variant)
     if (!match.compatible) return false
-    currentCode.value = generateControllerCode(currentEntry.value, selection.variant)
-
-    const analysis = await analyze(currentCode.value)
-    syncUserParams(analysis.olCalls)
-    controllerStatusNames.value = analysis.olCalls
-      .filter((c) => c.name === 'openloop.status')
-      .map((c) => (typeof c.args[0] === 'string' ? c.args[0] : `status_${c.line}`))
+    const code = generateControllerCode(currentEntry.value, selection.variant)
+    setCurrentCode(code)
+    await syncAnalysisResult(code)
   }
 
   currentController.value = selection

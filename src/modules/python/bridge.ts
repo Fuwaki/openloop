@@ -1,18 +1,32 @@
 import { shallowRef, ref } from 'vue'
-import { usePyodide } from './usePyodide'
-import { appendOutput } from './useSimulationState'
+import { usePyodide } from './pyodide'
 
 /** 从 Python 代码中提取的 controller 函数 */
 export type ControllerFn = (state: Float64Array, t: number) => number
 
+type OutputSink = (entry: { type: 'stdout' | 'stderr' | 'error' | 'result'; text: string }) => void
+
+let outputSink: OutputSink | null = null
+
+/**
+ * 注入输出回调，替代直接 import useSimulationState.appendOutput。
+ * 在 App.vue setup 中完成注入。
+ */
+export function setOutputSink(sink: OutputSink) {
+  outputSink = sink
+}
+
+function emit(entry: { type: 'stdout' | 'stderr' | 'error' | 'result'; text: string }) {
+  if (outputSink) {
+    outputSink(entry)
+  } else {
+    console.warn('[bridge] outputSink 未注入，输出丢失:', entry.text)
+  }
+}
+
 /**
  * Controller 桥接 — 模块级单例。
  * 加载用户 Python 代码，提取 controller 函数供仿真引擎调用。
- *
- * 用户代码必须定义 `controller(state, t)` 函数：
- *   - state: Float64Array 状态向量
- *   - t: number 当前仿真时间
- *   - 返回: number 控制输入
  */
 
 const pyodide = usePyodide()
@@ -51,21 +65,20 @@ async function load(code: string): Promise<boolean> {
   // 顶层输出
   if (result.error) {
     error.value = result.error
-    appendOutput({ type: 'error', text: result.error })
+    emit({ type: 'error', text: result.error })
     return false
   }
 
   // 设置全局 stdout/stderr 捕获（放在 runPythonAsync 之后，避免被覆盖）
-  // 仿真循环中 controller 的 print() 会通过这里进入 outputHistory
   if (py) {
-    py.setStdout({ batched: (s: string) => appendOutput({ type: 'stdout', text: s }) })
-    py.setStderr({ batched: (s: string) => appendOutput({ type: 'stderr', text: s }) })
+    py.setStdout({ batched: (s: string) => emit({ type: 'stdout', text: s }) })
+    py.setStderr({ batched: (s: string) => emit({ type: 'stderr', text: s }) })
   }
 
   // 提取 controller 函数
   if (!py) {
     error.value = 'Pyodide 实例不可用'
-    appendOutput({ type: 'error', text: 'Pyodide 实例不可用' })
+    emit({ type: 'error', text: 'Pyodide 实例不可用' })
     return false
   }
 
@@ -75,7 +88,7 @@ async function load(code: string): Promise<boolean> {
     if (typeof fn !== 'function') {
       const msg = '未找到 controller 函数，请确保定义了 def controller(state, t): ...'
       error.value = msg
-      appendOutput({ type: 'error', text: msg })
+      emit({ type: 'error', text: msg })
       return false
     }
 
@@ -103,7 +116,7 @@ function call(state: Float64Array, t: number): number {
   } catch (e) {
     const msg = `controller 运行错误: ${e instanceof Error ? e.message : String(e)}`
     error.value = msg
-    appendOutput({ type: 'error', text: msg })
+    emit({ type: 'error', text: msg })
     return 0
   }
 }

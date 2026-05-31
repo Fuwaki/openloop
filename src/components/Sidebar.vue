@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useSimulationRunner } from '@/composables/useSimulationRunner'
-import { useSimulationState } from '@/composables/useSimulationState'
-import { useToast } from '@/composables/useToast'
-import { useModelLoader } from '@/composables/useModelLoader'
-import { useControllerLoader } from '@/composables/useControllerLoader'
-import { matchControllerFamily } from '@/models/controller-table'
-import type { ModelEntry } from '@/models/model-table'
-import type { ControllerCategory, ControllerFamily } from '@/models/controller-table'
+import { useSimulationRunner, useSimulationState, useControllerLoader } from '@/modules/simulation'
+import { useToast } from '@/modules/app'
+import { useModelLoader, matchControllerFamily } from '@/modules/models'
+import type { ModelEntry, ControllerCategory, ControllerFamily } from '@/modules/models'
 import AppLogo from './AppLogo.vue'
 import ControllerPopup from './ControllerPopup.vue'
 

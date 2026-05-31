@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useSimulationState } from '@/composables/useSimulationState'
-import { useModelLoader } from '@/composables/useModelLoader'
-import { useSimulationRunner } from '@/composables/useSimulationRunner'
-import type { SolverId } from '@/composables/useSimulationRunner'
+import { useSimulationState } from '@/modules/simulation'
+import { useModelLoader } from '@/modules/models'
+import { useSimulationRunner, type SolverId } from '@/modules/simulation'
 
 const { currentPlant, currentParams } = useModelLoader()
 const { currentState, currentInput, currentIntermediates, solverStats, controllerStats, controllerStatus, controllerStatusNames, isSimulationRunning } = useSimulationState()

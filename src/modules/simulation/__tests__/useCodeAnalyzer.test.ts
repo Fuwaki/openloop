@@ -116,8 +116,8 @@ vi.mock('pyodide', () => {
   }
 })
 
-import { useCodeAnalyzer, resetAnalyzer } from '../useCodeAnalyzer'
-import { usePyodide } from '../usePyodide'
+import { useCodeAnalyzer, resetAnalyzer } from '../analyzer'
+import { usePyodide } from '@/modules/python/pyodide'
 
 describe('useCodeAnalyzer', () => {
   beforeEach(() => {

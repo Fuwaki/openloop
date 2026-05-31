@@ -4,7 +4,7 @@ import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { OPENLOOP_DARK } from '@/themes/monaco-dark'
 import { OPENLOOP_LIGHT } from '@/themes/monaco-light'
-import { useTheme } from '@/composables/useTheme'
+import { useTheme } from '@/modules/app'
 
 window.MonacoEnvironment = {
   getWorker: () => new EditorWorker(),

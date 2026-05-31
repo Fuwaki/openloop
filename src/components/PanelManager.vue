@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ResizablePanel from './ResizablePanel.vue'
 import LayoutNode from './LayoutNode.vue'
-import { useLayout } from '@/composables/useLayout'
+import { useLayout } from '@/modules/app'
 import type { LayoutNode as LayoutNodeType } from './layout-tree'
 
 const { root } = useLayout()

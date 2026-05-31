@@ -1,6 +1,5 @@
-import type { ModelEntry } from '@/models/model-table'
-import type { ControllerVariant } from '@/models/controller-table'
-import { resolveVariantCode } from '@/models/controller-table'
+import type { ModelEntry, ControllerVariant } from '@/modules/models'
+import { resolveVariantCode } from '@/modules/models'
 
 const TEMPLATE_ALIASES = ['q', 'q_dot', 'q_ddot', 'q_3dot', 'q_4dot']
 const LEGACY_TEMPLATE_NAMES = ['x', 'v', 'x1', 'x2', 'x3', 'x4']
@@ -37,7 +36,6 @@ function buildAliasLines(model: ModelEntry): string[] {
 function normalizeTemplate(body: string, outputName: string): string {
   let next = body
 
-  // 旧模板约定 x/v 表示被控量及其变化率；新生成器统一改成 q/q_dot。
   for (let i = 0; i < LEGACY_TEMPLATE_NAMES.length; i++) {
     const replacement = TEMPLATE_ALIASES[i] ?? `q_${i}`
     const pattern = new RegExp(`\\b${LEGACY_TEMPLATE_NAMES[i]}\\b`, 'g')
@@ -47,7 +45,6 @@ function normalizeTemplate(body: string, outputName: string): string {
   next = next.replace(/\{\{args\}\}/g, 'state, t')
   next = next.replace(/\{\{out\}\}/g, outputName)
 
-  // 旧模板通常自己定义 ref/error；这些局部变量保留可运行性。
   return next
 }
 

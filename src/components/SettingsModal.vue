@@ -2,16 +2,16 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import AppLogo from './AppLogo.vue'
 import UiToggle from './ui/UiToggle.vue'
-import { useTheme } from '@/composables/useTheme'
-import { useSettings } from '@/composables/useSettings'
+import { useTheme } from '@/modules/app'
+import { useSettings } from '@/modules/app'
 import {
   fetchPackageIndex,
   searchPackages,
   RECOMMENDED_PACKAGES,
   type PackageInfo,
-} from '@/composables/usePyodidePackages'
-import { getCachedEntries, clearCache, getCacheSize } from '@/composables/usePackageCache'
-import { usePyodide } from '@/composables/usePyodide'
+} from '@/modules/python'
+import { getCachedEntries, clearCache, getCacheSize } from '@/modules/python'
+import { usePyodide } from '@/modules/python'
 
 defineEmits<{
   close: []

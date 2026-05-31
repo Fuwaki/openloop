@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { useControllerBridge } from '../useControllerBridge'
+import { useControllerBridge } from '../bridge'
 
 // Mock pyodide — 模拟 globals.get('controller') 返回 Python 函数
 vi.mock('pyodide', () => {

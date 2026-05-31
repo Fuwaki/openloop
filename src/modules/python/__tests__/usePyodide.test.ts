@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { usePyodide } from '../usePyodide'
+import { usePyodide } from '../pyodide'
 
 // Mock pyodide module — WASM can't run in Node
 vi.mock('pyodide', () => {

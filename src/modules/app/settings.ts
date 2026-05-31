@@ -19,8 +19,11 @@ const defaults: AppSettings = {
 }
 
 const settings = ref<AppSettings>({ ...defaults })
+let loaded = false
 
 function load() {
+  if (loaded) return
+  loaded = true
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
@@ -55,9 +58,8 @@ function removePreloadPackage(name: string) {
   persist()
 }
 
-load()
-
 export function useSettings() {
+  load()
   return {
     settings,
     updateSettings,

@@ -4,6 +4,7 @@ const STORAGE_KEY = 'openloop-theme'
 
 const hue = ref(160)
 const isDark = ref(true)
+let initialized = false
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   const c = (1 - Math.abs(2 * l - 1)) * s
@@ -74,10 +75,11 @@ function toggleDark() {
   persist()
 }
 
-// 初始化
-load()
-applyTheme()
-
 export function useTheme() {
+  if (!initialized) {
+    initialized = true
+    load()
+    applyTheme()
+  }
   return { hue, isDark, setHue, toggleDark }
 }

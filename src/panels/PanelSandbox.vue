@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { SandboxRenderer } from '@/sandbox/SandboxRenderer'
 import type { SandboxFrame, SandboxToggles } from '@/sandbox/types'
-import { useSimulationState } from '@/composables/useSimulationState'
-import { useModelLoader } from '@/composables/useModelLoader'
+import { useSimulationState } from '@/modules/simulation'
+import { useModelLoader } from '@/modules/models'
 
 const hostRef = ref<HTMLElement>()
 const renderer = new SandboxRenderer()

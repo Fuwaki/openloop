@@ -1,4 +1,4 @@
-import { usePyodide } from './usePyodide'
+import { usePyodide } from '@/modules/python/pyodide'
 import analyzerCode from '@/python/analyzer.py?raw'
 
 export interface SyntaxError {
@@ -47,9 +47,14 @@ async function ensureInit() {
   analyzersReady = true
 }
 
-/** 重置分析器状态（仅测试用） */
 export function resetAnalyzer() {
   analyzersReady = false
+}
+
+function assertAnalysisObject(raw: unknown, label: string): void {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error(`${label}: invalid result from Python (not an object)`)
+  }
 }
 
 /**
@@ -86,12 +91,14 @@ export async function analyze(code: string): Promise<AnalysisResult> {
       ok: boolean
       errors?: SyntaxError[]
     }
+    assertAnalysisObject(syntaxResult, 'checkSyntax')
     syntaxRaw.destroy()
 
     const olRaw = detectOlCalls(code)
     const olResult = olRaw.toJs({ dict_converter: Object.fromEntries }) as {
       calls: OlCall[]
     }
+    assertAnalysisObject(olResult, 'detectOlCalls')
     olRaw.destroy()
 
     const ctrlRaw = detectController(code)
@@ -100,6 +107,7 @@ export async function analyze(code: string): Promise<AnalysisResult> {
       params: string[]
       line: number
     }
+    assertAnalysisObject(ctrlResult, 'detectController')
     ctrlRaw.destroy()
 
     checkSyntax.destroy()

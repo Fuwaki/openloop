@@ -2,8 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
-import { useSimulationState } from '@/composables/useSimulationState'
-import { useModelLoader } from '@/composables/useModelLoader'
+import { useSimulationState } from '@/modules/simulation'
+import { useModelLoader } from '@/modules/models'
 
 const { currentPlant } = useModelLoader()
 const {
@@ -75,7 +75,7 @@ let dragStartX = 0
 let dragStartViewStart = 0
 let dragStartViewDuration = 0
 
-const xBuf = computed<number[]>(() => { historyVersion.value; return getHistoryBuffer('t') })
+const xBuf = computed<number[]>(() => { void historyVersion.value; return getHistoryBuffer('t') })
 const statusSignalKey = computed(() => {
   const liveNames = controllerStatus.value.map((s) => s.name)
   const allNames = [...new Set([...controllerStatusNames.value, ...liveNames])]
@@ -148,14 +148,14 @@ const selectedYLabel = computed(() => {
 })
 
 const dataExtent = computed<Range | null>(() => {
-  historyVersion.value
+  void historyVersion.value
   const buf = xBuf.value
   if (buf.length < 2) return null
   return [buf[0]!, buf[buf.length - 1]!]
 })
 
 const hasData = computed(() => {
-  historyVersion.value
+  void historyVersion.value
   return xBuf.value.length > 1
 })
 

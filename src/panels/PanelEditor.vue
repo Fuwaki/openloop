@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from 'vue'
 import CodeEditor, { type EditorDecoration } from '@/components/CodeEditor.vue'
-import { useCodeExecutor } from '@/composables/useCodeExecutor'
-import { useSimulationState } from '@/composables/useSimulationState'
-import { useCodeAnalyzer, type AnalysisResult } from '@/composables/useCodeAnalyzer'
-import { useUserParams } from '@/composables/useUserParams'
+import { useCodeExecutor, useSimulationState, useCodeAnalyzer, useUserParams, type AnalysisResult } from '@/modules/simulation'
 import type * as monaco from 'monaco-editor'
 
 const { runOnce, isRunning, isPyodideReady, isPyodideLoading } = useCodeExecutor()

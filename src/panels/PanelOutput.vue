@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
-import { useSimulationState } from '@/composables/useSimulationState'
-import { useSimulationRunner } from '@/composables/useSimulationRunner'
+import { useSimulationState, useSimulationRunner } from '@/modules/simulation'
 
 const { outputHistory, clearOutput } = useSimulationState()
 const runner = useSimulationRunner()

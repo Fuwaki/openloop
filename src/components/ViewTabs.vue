@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useLayout } from '@/composables/useLayout'
+import { useLayout } from '@/modules/app'
 import { getViewPresets, type ViewPreset } from '@/views/registry'
 
 const props = defineProps<{

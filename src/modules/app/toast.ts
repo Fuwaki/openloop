@@ -24,6 +24,10 @@ function toast(message: string, type: ToastType = 'info', duration = 4000) {
   }
 }
 
+function clearAll() {
+  toasts.value = []
+}
+
 export function useToast() {
-  return { toasts, toast, remove }
+  return { toasts, toast, remove, clearAll }
 }

@@ -1,4 +1,4 @@
-import { usePyodide } from './usePyodide'
+import { usePyodide } from './pyodide'
 import openloopCode from '@/python/openloop.py?raw'
 
 const pyodide = usePyodide()
@@ -7,23 +7,24 @@ let injected = false
 /**
  * 注入 openloop 模块到 Pyodide 全局命名空间。
  * 在仿真启动前调用一次。
+ * 失败时 throw Error，让调用方能正确中止。
  */
 export async function injectOpenLoop() {
   if (injected) return
   if (!pyodide.isReady.value) {
     await pyodide.init()
   }
-  if (!pyodide.isReady.value) return
+  if (!pyodide.isReady.value) {
+    throw new Error('Pyodide 未就绪，无法注入 openloop 模块')
+  }
 
   // 执行 openloop.py，定义函数到 globals
   const r1 = pyodide.runPython(openloopCode)
   if (r1.error) {
-    console.error('openloop 模块注入失败:', r1.error)
-    return
+    throw new Error(`openloop 模块注入失败: ${r1.error}`)
   }
 
-  // 创建 openloop 模块对象并注册到 sys.modules，
-  // 让用户能 import openloop / import openloop as ol / from openloop import parameter
+  // 创建 openloop 模块对象并注册到 sys.modules
   const r2 = pyodide.runPython(`
 import sys as _ol_sys, types as _ol_types
 openloop = _ol_types.ModuleType('openloop')
@@ -33,8 +34,7 @@ _ol_sys.modules['openloop'] = openloop
 del _ol_types
 `)
   if (r2.error) {
-    console.error('openloop 模块注册失败:', r2.error)
-    return
+    throw new Error(`openloop 模块注册失败: ${r2.error}`)
   }
 
   injected = true

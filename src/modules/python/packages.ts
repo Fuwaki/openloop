@@ -46,19 +46,6 @@ export function searchPackages(query: string, limit = 20): PackageInfo[] {
   return results
 }
 
-export function getPackageInfo(name: string): PackageInfo | undefined {
-  return packageIndex?.get(name)
-}
-
-export function isPackageAvailable(name: string): boolean {
-  return packageIndex?.has(name) ?? false
-}
-
-export function getAllPackages(): PackageInfo[] {
-  if (!packageIndex) return []
-  return Array.from(packageIndex.values())
-}
-
 // 常用科学计算/控制相关包
 export const RECOMMENDED_PACKAGES = [
   'numpy',
