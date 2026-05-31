@@ -37,6 +37,7 @@ export { emptyCode }
 
 export type ControllerCategory = 'linear' | 'nonlinear' | 'optimal' | 'robust' | 'adaptive' | 'heuristic'
 export type GenerationMode = 'generic' | 'model-specific'
+export type BenchmarkTier = 'implemented' | 'example' | 'skeleton'
 
 /** 控制器参数定义 */
 export interface ControllerParamDef {
@@ -59,6 +60,8 @@ export interface ControllerVariant {
   generationMode: GenerationMode
   starterCode?: string
   modelTemplates?: Record<string, string>
+  /** 基准测试成熟度：implemented=生产级, example=示例级, skeleton=骨架 */
+  benchmarkTier?: BenchmarkTier
 }
 
 /** 控制器族：侧栏展示的一级入口 */
@@ -108,6 +111,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 1,
         generationMode: 'generic',
         starterCode: pidCode,
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -126,6 +130,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 2,
         generationMode: 'generic',
         starterCode: pdCode,
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -148,6 +153,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 1,
         generationMode: 'generic',
         starterCode: leadLagCode,
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -167,6 +173,7 @@ const controllerFamilies: ControllerFamily[] = [
         maxOrder: 1,
         generationMode: 'generic',
         starterCode: slidingModeCode,
+        benchmarkTier: 'implemented',
       },
       {
         id: 'sliding-second-order',
@@ -176,6 +183,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 2,
         generationMode: 'generic',
         starterCode: slidingModeCode,
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -197,6 +205,7 @@ const controllerFamilies: ControllerFamily[] = [
         modelTemplates: {
           'inverted-pendulum': feedbackLinearCode,
         },
+        benchmarkTier: 'skeleton',
       },
     ],
   },
@@ -221,6 +230,7 @@ const controllerFamilies: ControllerFamily[] = [
         modelTemplates: {
           'inverted-pendulum': backsteppingCode,
         },
+        benchmarkTier: 'example',
       },
     ],
   },
@@ -243,6 +253,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 2,
         generationMode: 'generic',
         starterCode: lqrCode,
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -265,6 +276,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 2,
         generationMode: 'generic',
         starterCode: lqgCode,
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -286,6 +298,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 1,
         generationMode: 'generic',
         starterCode: mpcCode,
+        benchmarkTier: 'skeleton',
       },
     ],
   },
@@ -307,6 +320,7 @@ const controllerFamilies: ControllerFamily[] = [
         modelTemplates: {
           'mass-spring-damper': robustHinfCode,
         },
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -328,6 +342,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 1,
         generationMode: 'generic',
         starterCode: mracCode,
+        benchmarkTier: 'skeleton',
       },
     ],
   },
@@ -350,6 +365,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 2,
         generationMode: 'generic',
         starterCode: fuzzyCode,
+        benchmarkTier: 'example',
       },
     ],
   },
@@ -371,6 +387,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 2,
         generationMode: 'generic',
         starterCode: neuralNetCode,
+        benchmarkTier: 'example',
       },
     ],
   },

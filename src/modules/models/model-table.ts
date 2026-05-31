@@ -49,6 +49,14 @@ export interface ControlObjective {
   inputGainSign: 1 | -1
 }
 
+/** 基准测试配置（给 test:convergence 用的"考题"） */
+export interface BenchmarkConfig {
+  /** 初始状态向量，归一化误差应接近 1.0 */
+  initState: number[]
+  /** 误差进入此带视为收敛（如 0.05 = ±5%） */
+  settlingBand: number
+}
+
 /** 模型表条目 */
 export interface ModelEntry {
   id: string
@@ -63,6 +71,8 @@ export interface ModelEntry {
   ioSpec: IOSpec
   /** 默认闭环控制目标 */
   controlObjective: ControlObjective
+  /** 基准测试配置 */
+  benchmark: BenchmarkConfig
   /** 创建仿真用 PlantModel */
   createPlant: (params?: Record<string, number>) => SimPlant
   /** 创建沙盒场景（可选） */
@@ -106,6 +116,10 @@ const modelTable: ModelEntry[] = [
       input: 'F',
       inputGainSign: 1,
     },
+    benchmark: {
+      initState: [1.0, 0.0],
+      settlingBand: 0.05,
+    },
     createPlant: (p) => createMassSpring(p as { m?: number; c?: number; k?: number }),
     createScene: (frame) => createMassSpringScene(frame),
   },
@@ -136,6 +150,10 @@ const modelTable: ModelEntry[] = [
       derivativeChain: ['x'],
       input: 'u',
       inputGainSign: 1,
+    },
+    benchmark: {
+      initState: [1.0],
+      settlingBand: 0.05,
     },
     createPlant: (p) => createFirstOrder(p as { tau?: number; K?: number }),
     createScene: (frame, p) => createFirstOrderScene(frame, p),
@@ -173,6 +191,10 @@ const modelTable: ModelEntry[] = [
       input: 'F',
       inputGainSign: -1,
     },
+    benchmark: {
+      initState: [0.1, 0.0, 0.35, 0.0],
+      settlingBand: 0.05,
+    },
     createPlant: (p) => createInvertedPendulum(p as { M?: number; m?: number; l?: number; g?: number }),
     createScene: (frame, p) => createInvertedPendulumScene(frame, p),
   },
@@ -186,4 +208,8 @@ export function getModelEntry(id: string): ModelEntry | undefined {
 
 export function getModelsByCategory(category: ModelEntry['category']): ModelEntry[] {
   return modelTable.filter((m) => m.category === category)
+}
+
+export function getAllModels(): ModelEntry[] {
+  return modelTable
 }

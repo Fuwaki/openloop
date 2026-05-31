@@ -2,8 +2,10 @@
 export {
   getModelEntry,
   getModelsByCategory,
+  getAllModels,
   DEFAULT_MODEL_ID,
   type ModelEntry,
+  type BenchmarkConfig,
   type ParamDef,
   type VarSpec,
   type IOSpec,
@@ -24,6 +26,7 @@ export {
   type ControllerCategory,
   type ControllerParamDef,
   type GenerationMode,
+  type BenchmarkTier,
 } from './controller-table'
 
 // tags
