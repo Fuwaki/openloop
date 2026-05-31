@@ -13,12 +13,15 @@ import { createInvertedPendulumScene } from '@/sandbox/scenes/invertedPendulum'
 import { createDcMotorScene } from '@/sandbox/scenes/dcMotor'
 import { createBallAndBeamScene } from '@/sandbox/scenes/ballAndBeam'
 import { createMaglevScene } from '@/sandbox/scenes/maglev'
+import { createTankLevel } from '@/simulation/plants/tankLevel'
+import { createTankLevelScene } from '@/sandbox/scenes/tankLevel'
 import iconMassSpring from '@/assets/icons/models/mass-spring-damper.svg?raw'
 import iconFirstOrder from '@/assets/icons/models/first-order.svg?raw'
 import iconInvertedPendulum from '@/assets/icons/models/inverted-pendulum.svg?raw'
 import iconDcMotor from '@/assets/icons/models/dc-motor.svg?raw'
 import iconBallAndBeam from '@/assets/icons/models/ball-and-beam.svg?raw'
 import iconMaglev from '@/assets/icons/models/maglev.svg?raw'
+import iconTankLevel from '@/assets/icons/models/tank-level.svg?raw'
 
 /** 参数定义 */
 export interface ParamDef {
@@ -323,6 +326,41 @@ const modelTable: ModelEntry[] = [
     },
     createPlant: (p) => createMaglev(p as { g?: number; k?: number; y_eq?: number }),
     createScene: (frame, p) => createMaglevScene(frame, p),
+  },
+  {
+    id: 'tank-level',
+    name: '液位水箱',
+    category: 'nonlinear',
+    description: '非线性液位系统，出口流量与液位平方根成正比',
+    icon: iconTankLevel,
+    params: [
+      { name: 'A', value: 1.0, min: 0.1, max: 10, step: 0.1 },
+      { name: 'a', value: 0.5, min: 0.01, max: 5, step: 0.01 },
+    ],
+    systemTags: ['nonlinear'],
+    ioSpec: {
+      stateVars: [
+        { name: 'h', unit: 'm', description: '液位' },
+      ],
+      outputs: [
+        { name: 'u', unit: 'm³/s', description: '入口流量' },
+      ],
+    },
+    controlObjective: {
+      id: 'level-regulation',
+      name: '液位调节',
+      description: '控制液位 h 收敛到目标值',
+      reference: 0.25,
+      derivativeChain: ['h'],
+      input: 'u',
+      inputGainSign: 1,
+    },
+    benchmark: {
+      initState: [0.8],
+      settlingBand: 0.05,
+    },
+    createPlant: (p) => createTankLevel(p as { A?: number; a?: number }),
+    createScene: (frame, p) => createTankLevelScene(frame, p),
   },
 ]
 
