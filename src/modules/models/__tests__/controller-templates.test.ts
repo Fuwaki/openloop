@@ -219,27 +219,23 @@ describe('generateControllerCode 上下文注入', () => {
 // ── 兼容性矩阵 ──
 
 describe('控制器兼容性', () => {
-  it('一阶系统不兼容二阶控制器', () => {
+  it('一阶系统不兼容二阶及以上控制器', () => {
     const model = getModelEntry('first-order')!
-    const secondOrderVariants = ['pd', 'lqr', 'lqg', 'fuzzy', 'neural-net', 'backstepping', 'feedback-linearization']
-    for (const fid of secondOrderVariants) {
-      const family = getAllControllers().find(c => c.id === fid)
-      if (!family) continue
+    for (const family of getAllControllers()) {
       for (const v of family.variants) {
+        if (v.minOrder <= 1) continue
         const result = matchControllerVariant(model, v)
         expect(result.compatible).toBe(false)
       }
     }
   })
 
-  it('模型专用控制器对无关模型不可用', () => {
-    const model = getModelEntry('mass-spring-damper')!
-    const msVariants = ['feedback-linearization', 'backstepping']
-    for (const fid of msVariants) {
-      const family = getAllControllers().find(c => c.id === fid)
-      if (!family) continue
+  it('模型专用控制器对无模板的模型不可用', () => {
+    const model = getModelEntry('first-order')!
+    const families = getAllControllers()
+    for (const family of families) {
       for (const v of family.variants) {
-        expect(v.generationMode).toBe('model-specific')
+        if (v.generationMode !== 'model-specific') continue
         const result = matchControllerVariant(model, v)
         expect(result.compatible).toBe(false)
       }

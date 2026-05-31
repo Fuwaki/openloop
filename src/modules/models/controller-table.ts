@@ -6,8 +6,6 @@ import pidCode from '@/python/controllers/pid.py?raw'
 import pdCode from '@/python/controllers/pd.py?raw'
 import leadLagCode from '@/python/controllers/lead_lag.py?raw'
 import slidingModeCode from '@/python/controllers/sliding_mode.py?raw'
-import feedbackLinearCode from '@/python/controllers/feedback_linearization.py?raw'
-import backsteppingCode from '@/python/controllers/backstepping.py?raw'
 import lqrCode from '@/python/controllers/lqr.py?raw'
 import lqgCode from '@/python/controllers/lqg.py?raw'
 import mpcCode from '@/python/controllers/mpc.py?raw'
@@ -15,6 +13,18 @@ import robustHinfCode from '@/python/controllers/robust_hinf.py?raw'
 import mracCode from '@/python/controllers/mrac.py?raw'
 import fuzzyCode from '@/python/controllers/fuzzy.py?raw'
 import neuralNetCode from '@/python/controllers/neural_net.py?raw'
+import backsteppingCode from '@/python/controllers/backstepping.py?raw'
+import pidDerivMeasCode from '@/python/controllers/pid_derivative_measurement.py?raw'
+import pidAntiWindupCode from '@/python/controllers/pid_antiwindup.py?raw'
+import pid2DofCode from '@/python/controllers/pid_2dof.py?raw'
+import pidIncrementalCode from '@/python/controllers/pid_incremental.py?raw'
+import slidingBoundaryCode from '@/python/controllers/sliding_boundary_layer.py?raw'
+import slidingSuperTwistCode from '@/python/controllers/sliding_super_twisting.py?raw'
+import stateFeedbackCode from '@/python/controllers/state_feedback.py?raw'
+import deadbeatCode from '@/python/controllers/deadbeat.py?raw'
+import internalModelCode from '@/python/controllers/internal_model.py?raw'
+import feedbackLinearIPCode from '@/python/controllers/feedback_linearization_ip.py?raw'
+import backsteppingIPCode from '@/python/controllers/backstepping_ip.py?raw'
 
 // ── 从 .svg 文件导入图标 ──
 import pidIcon from '@/assets/icons/controllers/pid.svg?raw'
@@ -30,6 +40,9 @@ import robustHinfIcon from '@/assets/icons/controllers/robust_hinf.svg?raw'
 import mracIcon from '@/assets/icons/controllers/mrac.svg?raw'
 import fuzzyIcon from '@/assets/icons/controllers/fuzzy.svg?raw'
 import neuralNetIcon from '@/assets/icons/controllers/neural_net.svg?raw'
+import stateFeedbackIcon from '@/assets/icons/controllers/state_feedback.svg?raw'
+import deadbeatIcon from '@/assets/icons/controllers/deadbeat.svg?raw'
+import internalModelIcon from '@/assets/icons/controllers/internal_model.svg?raw'
 
 // ── 空控制器（无控制器选中时的默认模板） ──
 import emptyCode from '@/python/controllers/empty.py?raw'
@@ -113,6 +126,57 @@ const controllerFamilies: ControllerFamily[] = [
         starterCode: pidCode,
         benchmarkTier: 'implemented',
       },
+      {
+        id: 'pid-derivative-measurement',
+        name: '微分先行 PID',
+        description: '微分项作用于被控量导数，避免参考值跳变时的微分 kick',
+        params: pidParams,
+        minOrder: 2,
+        generationMode: 'generic',
+        starterCode: pidDerivMeasCode,
+        benchmarkTier: 'implemented',
+      },
+      {
+        id: 'pid-anti-windup',
+        name: '抗饱和 PID',
+        description: '积分器限幅，防止执行器饱和时的 windup 效应',
+        params: [
+          { name: 'Kp', value: 10, min: 0, max: 100, step: 0.1 },
+          { name: 'Ki', value: 1, min: 0, max: 50, step: 0.1 },
+          { name: 'Kd', value: 2, min: 0, max: 20, step: 0.1 },
+          { name: 'i_max', value: 5, min: 0.1, max: 50, step: 0.1 },
+        ],
+        minOrder: 1,
+        generationMode: 'generic',
+        starterCode: pidAntiWindupCode,
+        benchmarkTier: 'implemented',
+      },
+      {
+        id: 'pid-2dof',
+        name: '二自由度 PID',
+        description: '分离设定值的比例和微分增益，独立优化跟踪与抗扰',
+        params: [
+          { name: 'Kp', value: 10, min: 0, max: 100, step: 0.1 },
+          { name: 'Ki', value: 1, min: 0, max: 50, step: 0.1 },
+          { name: 'Kd', value: 2, min: 0, max: 20, step: 0.1 },
+          { name: 'beta', value: 0.5, min: 0, max: 1, step: 0.05 },
+          { name: 'gamma', value: 0.1, min: 0, max: 1, step: 0.05 },
+        ],
+        minOrder: 2,
+        generationMode: 'generic',
+        starterCode: pid2DofCode,
+        benchmarkTier: 'implemented',
+      },
+      {
+        id: 'pid-incremental',
+        name: '增量式 PID',
+        description: '输出增量而非绝对值，工业控制常用，天然抗积分饱和',
+        params: pidParams,
+        minOrder: 1,
+        generationMode: 'generic',
+        starterCode: pidIncrementalCode,
+        benchmarkTier: 'implemented',
+      },
     ],
   },
   {
@@ -185,6 +249,34 @@ const controllerFamilies: ControllerFamily[] = [
         starterCode: slidingModeCode,
         benchmarkTier: 'implemented',
       },
+      {
+        id: 'sliding-boundary-layer',
+        name: '边界层滑模',
+        description: '用 sat 函数替代 sign，消除滑模面附近的抖振',
+        params: [
+          { name: 'c', value: 5, min: 0.5, max: 20, step: 0.5 },
+          { name: 'eta', value: 2, min: 0.1, max: 10, step: 0.1 },
+          { name: 'phi', value: 0.5, min: 0.01, max: 5, step: 0.01 },
+        ],
+        minOrder: 2,
+        generationMode: 'generic',
+        starterCode: slidingBoundaryCode,
+        benchmarkTier: 'implemented',
+      },
+      {
+        id: 'sliding-super-twisting',
+        name: '超螺旋滑模',
+        description: '二阶滑模算法，连续控制输出，无抖振',
+        params: [
+          { name: 'lambda', value: 5, min: 0.5, max: 30, step: 0.5 },
+          { name: 'alpha', value: 10, min: 1, max: 50, step: 1 },
+          { name: 'c', value: 5, min: 0.5, max: 20, step: 0.5 },
+        ],
+        minOrder: 2,
+        generationMode: 'generic',
+        starterCode: slidingSuperTwistCode,
+        benchmarkTier: 'implemented',
+      },
     ],
   },
   {
@@ -198,14 +290,17 @@ const controllerFamilies: ControllerFamily[] = [
         id: 'feedback-linearization-model',
         name: '模型专用反馈线性化',
         description: '需要当前模型提供专用控制律模板',
-        params: [],
+        params: [
+          { name: 'Kp', value: 20, min: 1, max: 100, step: 1 },
+          { name: 'Kd', value: 10, min: 0.5, max: 50, step: 0.5 },
+        ],
         minOrder: 2,
         requiredSystemTags: ['nonlinear'],
         generationMode: 'model-specific',
         modelTemplates: {
-          'inverted-pendulum': feedbackLinearCode,
+          'inverted-pendulum': feedbackLinearIPCode,
         },
-        benchmarkTier: 'skeleton',
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -216,6 +311,19 @@ const controllerFamilies: ControllerFamily[] = [
     description: '递归构造 Lyapunov 函数，通常依赖严格反馈模型结构',
     icon: backsteppingIcon,
     variants: [
+      {
+        id: 'backstepping-generic',
+        name: '通用反步法',
+        description: '二阶通用反步法，含阻尼补偿项',
+        params: [
+          { name: 'c1', value: 5, min: 0.5, max: 20, step: 0.5 },
+          { name: 'c2', value: 3, min: 0.5, max: 20, step: 0.5 },
+        ],
+        minOrder: 2,
+        generationMode: 'generic',
+        starterCode: backsteppingCode,
+        benchmarkTier: 'implemented',
+      },
       {
         id: 'backstepping-model',
         name: '模型专用反步法',
@@ -228,9 +336,9 @@ const controllerFamilies: ControllerFamily[] = [
         requiredSystemTags: ['nonlinear'],
         generationMode: 'model-specific',
         modelTemplates: {
-          'inverted-pendulum': backsteppingCode,
+          'inverted-pendulum': backsteppingIPCode,
         },
-        benchmarkTier: 'example',
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -261,7 +369,7 @@ const controllerFamilies: ControllerFamily[] = [
     id: 'lqg',
     name: 'LQG',
     category: 'optimal',
-    description: 'LQR + Kalman 滤波，当前提供二阶目标链示例模板',
+    description: 'LQR + 离散 Kalman 滤波器，用估计状态做反馈',
     icon: lqgIcon,
     variants: [
       {
@@ -313,7 +421,11 @@ const controllerFamilies: ControllerFamily[] = [
         id: 'hinf-model',
         name: '模型专用 H∞',
         description: '没有模型专用模板时禁用',
-        params: [],
+        params: [
+          { name: 'gamma', value: 2, min: 0.5, max: 20, step: 0.5 },
+          { name: 'q_weight', value: 10, min: 0.1, max: 100, step: 0.5 },
+          { name: 'r_weight', value: 1, min: 0.1, max: 50, step: 0.1 },
+        ],
         minOrder: 2,
         requiredSystemTags: ['linear'],
         generationMode: 'model-specific',
@@ -337,12 +449,12 @@ const controllerFamilies: ControllerFamily[] = [
         description: '面向单输出目标的一阶自适应控制框架',
         params: [
           { name: 'am', value: 5, min: 0.5, max: 20, step: 0.5 },
-          { name: 'gamma', value: 1, min: 0.1, max: 10, step: 0.1 },
+          { name: 'gamma', value: 2, min: 0.1, max: 20, step: 0.1 },
         ],
         minOrder: 1,
         generationMode: 'generic',
         starterCode: mracCode,
-        benchmarkTier: 'skeleton',
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -365,7 +477,7 @@ const controllerFamilies: ControllerFamily[] = [
         minOrder: 2,
         generationMode: 'generic',
         starterCode: fuzzyCode,
-        benchmarkTier: 'example',
+        benchmarkTier: 'implemented',
       },
     ],
   },
@@ -388,6 +500,71 @@ const controllerFamilies: ControllerFamily[] = [
         generationMode: 'generic',
         starterCode: neuralNetCode,
         benchmarkTier: 'example',
+      },
+    ],
+  },
+  {
+    id: 'state-feedback',
+    name: '极点配置',
+    category: 'linear',
+    description: '通过指定闭环极点位置计算状态反馈增益',
+    icon: stateFeedbackIcon,
+    variants: [
+      {
+        id: 'state-feedback-second-order',
+        name: '二阶极点配置',
+        description: '指定两个闭环极点，自动计算反馈增益 K',
+        params: [
+          { name: 'p1', value: -5, min: -20, max: -0.1, step: 0.5 },
+          { name: 'p2', value: -3, min: -20, max: -0.1, step: 0.5 },
+        ],
+        minOrder: 2,
+        generationMode: 'generic',
+        starterCode: stateFeedbackCode,
+        benchmarkTier: 'implemented',
+      },
+    ],
+  },
+  {
+    id: 'deadbeat',
+    name: 'Deadbeat',
+    category: 'optimal',
+    description: '有限拍控制，在最少步数内使输出精确到达参考值',
+    icon: deadbeatIcon,
+    variants: [
+      {
+        id: 'deadbeat-first-order',
+        name: '一阶 Deadbeat',
+        description: '基于逆模型的有限拍控制，对模型参数敏感',
+        params: [],
+        minOrder: 1,
+        maxOrder: 1,
+        generationMode: 'generic',
+        starterCode: deadbeatCode,
+        benchmarkTier: 'example',
+      },
+    ],
+  },
+  {
+    id: 'internal-model',
+    name: '内模控制',
+    category: 'linear',
+    description: '基于内模原理的控制，控制器包含被控对象模型的逆',
+    icon: internalModelIcon,
+    variants: [
+      {
+        id: 'internal-model-first-order',
+        name: '一阶内模控制',
+        description: '低通滤波器 + 逆模型，实现无静差跟踪',
+        params: [
+          { name: 'tau_f', value: 0.1, min: 0.01, max: 2, step: 0.01 },
+          { name: 'gain', value: 5, min: 0.1, max: 50, step: 0.1 },
+        ],
+        minOrder: 1,
+        maxOrder: 1,
+        generationMode: 'generic',
+        starterCode: internalModelCode,
+        benchmarkTier: 'implemented',
       },
     ],
   },
