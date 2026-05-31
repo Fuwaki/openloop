@@ -74,10 +74,15 @@ src/
 │   │   ├── rk4.ts           # 四阶 Runge-Kutta
 │   │   └── euler.ts         # 前向 Euler
 │   └── plants/
-│       ├── types.ts         # PlantModel / VariableDef 接口
-│       ├── massSpring.ts    # 质量-弹簧-阻尼
-│       ├── firstOrder.ts    # 一阶惯性系统
-│       └── invertedPendulum.ts  # 倒立摆
+│       ├── types.ts              # PlantModel / VariableDef 接口
+│       ├── massSpring.ts         # 质量-弹簧-阻尼
+│       ├── firstOrder.ts         # 一阶惯性系统
+│       ├── invertedPendulum.ts   # 倒立摆
+│       ├── dcMotor.ts            # 直流电机
+│       ├── ballAndBeam.ts        # 球杆系统
+│       ├── maglev.ts             # 磁悬浮
+│       ├── tankLevel.ts          # 液位水箱
+│       └── doublePendulum.ts     # 双摆
 │
 ├── sandbox/                 # 2D 物理沙盒（PixiJS）
 │   ├── types.ts             # SandboxScene / Drawable / RenderContext
@@ -91,10 +96,15 @@ src/
 │   ├── annotations/         # 标注绘图
 │   │   ├── types.ts         # VectorData / ScalarLabelData
 │   │   └── draw.ts          # drawVector / drawScalarLabel
-│   └── scenes/              # 场景定义
-│       ├── massSpring.ts    # 弹簧振子场景
-│       ├── firstOrder.ts    # 一阶系统场景
-│       └── invertedPendulum.ts  # 倒立摆场景
+│   └── scenes/                  # 场景定义
+│       ├── massSpring.ts        # 弹簧振子场景
+│       ├── firstOrder.ts        # 一阶系统场景
+│       ├── invertedPendulum.ts  # 倒立摆场景
+│       ├── dcMotor.ts           # 直流电机场景
+│       ├── ballAndBeam.ts       # 球杆系统场景
+│       ├── maglev.ts            # 磁悬浮场景
+│       ├── tankLevel.ts         # 液位水箱场景
+│       └── doublePendulum.ts    # 双摆场景
 │
 ├── panels/                  # 面板组件
 │   ├── registry.ts          # 面板类型注册表
