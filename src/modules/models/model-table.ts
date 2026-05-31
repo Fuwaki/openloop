@@ -15,6 +15,8 @@ import { createBallAndBeamScene } from '@/sandbox/scenes/ballAndBeam'
 import { createMaglevScene } from '@/sandbox/scenes/maglev'
 import { createTankLevel } from '@/simulation/plants/tankLevel'
 import { createTankLevelScene } from '@/sandbox/scenes/tankLevel'
+import { createDoublePendulum } from '@/simulation/plants/doublePendulum'
+import { createDoublePendulumScene } from '@/sandbox/scenes/doublePendulum'
 import iconMassSpring from '@/assets/icons/models/mass-spring-damper.svg?raw'
 import iconFirstOrder from '@/assets/icons/models/first-order.svg?raw'
 import iconInvertedPendulum from '@/assets/icons/models/inverted-pendulum.svg?raw'
@@ -22,6 +24,7 @@ import iconDcMotor from '@/assets/icons/models/dc-motor.svg?raw'
 import iconBallAndBeam from '@/assets/icons/models/ball-and-beam.svg?raw'
 import iconMaglev from '@/assets/icons/models/maglev.svg?raw'
 import iconTankLevel from '@/assets/icons/models/tank-level.svg?raw'
+import iconDoublePendulum from '@/assets/icons/models/double-pendulum.svg?raw'
 
 /** 参数定义 */
 export interface ParamDef {
@@ -361,6 +364,49 @@ const modelTable: ModelEntry[] = [
     },
     createPlant: (p) => createTankLevel(p as { A?: number; a?: number }),
     createScene: (frame, p) => createTankLevelScene(frame, p),
+  },
+  {
+    id: 'double-pendulum',
+    name: '双摆',
+    category: 'nonlinear',
+    description: '双摆系统，经典混沌非线性动力学',
+    icon: iconDoublePendulum,
+    params: [
+      { name: 'm1', value: 1.0, min: 0.1, max: 10, step: 0.1 },
+      { name: 'm2', value: 1.0, min: 0.1, max: 10, step: 0.1 },
+      { name: 'l1', value: 1.0, min: 0.1, max: 3, step: 0.1 },
+      { name: 'l2', value: 1.0, min: 0.1, max: 3, step: 0.1 },
+      { name: 'b1', value: 0.01, min: 0, max: 1, step: 0.001 },
+      { name: 'b2', value: 0.01, min: 0, max: 1, step: 0.001 },
+      { name: 'g', value: 9.81, min: 0, max: 20, step: 0.1, env: true },
+    ],
+    systemTags: ['nonlinear'],
+    ioSpec: {
+      stateVars: [
+        { name: 'theta1', unit: 'rad', description: '连杆1角度' },
+        { name: 'omega1', unit: 'rad/s', description: '连杆1角速度' },
+        { name: 'theta2', unit: 'rad', description: '连杆2角度' },
+        { name: 'omega2', unit: 'rad/s', description: '连杆2角速度' },
+      ],
+      outputs: [
+        { name: 'tau', unit: 'N·m', description: '关节1力矩' },
+      ],
+    },
+    controlObjective: {
+      id: 'theta1-regulation',
+      name: '连杆1角度调节',
+      description: '控制连杆1角度 theta1 收敛到 0（竖直向下）',
+      reference: 0,
+      derivativeChain: ['theta1', 'omega1'],
+      input: 'tau',
+      inputGainSign: 1,
+    },
+    benchmark: {
+      initState: [0.3, 0.0, 0.0, 0.0],
+      settlingBand: 0.05,
+    },
+    createPlant: (p) => createDoublePendulum(p as { m1?: number; m2?: number; l1?: number; l2?: number; b1?: number; b2?: number; g?: number }),
+    createScene: (frame, p) => createDoublePendulumScene(frame, p),
   },
 ]
 
