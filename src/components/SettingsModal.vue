@@ -13,10 +13,13 @@ import {
 import { getCachedEntries, clearCache, getCacheSize } from '@/modules/python'
 import { usePyodide } from '@/modules/python'
 
+declare const __APP_VERSION__: string
+
 defineEmits<{
   close: []
 }>()
 
+const appVersion = __APP_VERSION__
 const { hue, isDark, setHue, toggleDark } = useTheme()
 const { settings, addPreloadPackage, removePreloadPackage } = useSettings()
 const { isReady: pyodideReady, isLoading: pyodideLoading, restart } = usePyodide()
@@ -346,7 +349,7 @@ watch(activeTab, (tab) => {
               <div class="w-full bg-bgBase rounded-lg p-4 border border-surfaceHover space-y-2.5">
                 <div class="flex items-center justify-between">
                   <span class="text-textMuted text-xs">版本</span>
-                  <span class="text-primary text-xs font-mono">v0.0.1</span>
+                  <span class="text-textBase text-xs font-mono">{{ appVersion }}</span>
                 </div>
                 <div class="border-t border-surfaceHover" />
                 <div class="flex items-center justify-between">
